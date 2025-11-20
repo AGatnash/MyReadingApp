@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReadStar - Learn to Read</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div id="prefix-display" class="empty"></div>
+        </header>
+
+        <div id="controls">
+            <button id="btn-back" class="control-btn" aria-label="Back">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back
+            </button>
+            <button id="btn-clear" class="control-btn" aria-label="Clear">Clear</button>
+            <button id="btn-settings" class="control-btn" aria-label="Settings">Settings</button>
+        </div>
+
+        <div id="action-area">
+            <button id="btn-read" class="action-btn hidden">
+                <span class="icon">🎙️</span> Read this word
+            </button>
+        </div>
+
+        <main>
+            <div id="letter-grid">
+                <!-- Letters will be injected here -->
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Settings</h2>
+                
+                <div class="setting-group">
+                    <label for="word-list-input">Word List (one per line)</label>
+                    <textarea id="word-list-input" rows="10"></textarea>
+                    <button id="btn-save-words" class="primary-btn">Save Words</button>
+                </div>
+
+                <div class="setting-group">
+                    <h3>Completed Words</h3>
+                    <div id="completed-log" class="log-container"></div>
+                    <button id="btn-clear-log" class="secondary-btn">Clear Log</button>
+                </div>
+
+                <div class="setting-group">
+                    <h3>Options</h3>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggle-sounds" checked>
+                        <span>Letter Sounds</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggle-speech-prompts" checked>
+                        <span>Speech Prompts</span>
+                    </label>
+                </div>
+
+                <button id="btn-close-settings" class="close-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Confetti Canvas -->
+        <canvas id="confetti-canvas"></canvas>
+    </div>
+
+    <script src="app.js" type="module"></script>
+</body>
+</html>
