@@ -1,5 +1,8 @@
 export class UIManager {
     constructor() {
+        this.introScreen = document.getElementById('intro-screen');
+        this.introTitle = document.getElementById('intro-title');
+        this.mainApp = document.getElementById('main-app');
         this.grid = document.getElementById('letter-grid');
         this.prefixDisplay = document.getElementById('prefix-display');
         this.btnBack = document.getElementById('btn-back');
@@ -25,6 +28,14 @@ export class UIManager {
     }
 
     bindInternalEvents() {
+        this.introTitle.addEventListener('click', () => this.emit('enterApp'));
+        this.introTitle.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                this.emit('enterApp');
+            }
+        });
+
         this.btnBack.addEventListener('click', () => this.emit('back'));
         this.btnClear.addEventListener('click', () => this.emit('clear'));
         this.btnRead.addEventListener('click', () => this.emit('read'));
@@ -100,5 +111,10 @@ export class UIManager {
 
         this.toggleSounds.checked = settings.soundsEnabled;
         this.toggleSpeechPrompts.checked = settings.speechPromptsEnabled;
+    }
+
+    showMainApp() {
+        this.introScreen.classList.add('hidden');
+        this.mainApp.classList.remove('hidden');
     }
 }

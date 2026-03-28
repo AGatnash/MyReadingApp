@@ -33,6 +33,7 @@ class App {
     }
 
     bindEvents() {
+        this.ui.on('enterApp', () => this.ui.showMainApp());
         this.ui.on('letterClick', (letter) => this.handleLetterClick(letter));
         this.ui.on('back', () => this.handleBack());
         this.ui.on('clear', () => this.handleClear());
