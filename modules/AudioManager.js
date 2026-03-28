@@ -4,6 +4,14 @@ export class AudioManager {
         this.soundsEnabled = true;
         this.speechPromptsEnabled = true;
 
+        this.letterAudio = new Map();
+        this.supportedLetters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+        this.supportedLetters.forEach(letter => {
+            const audio = new Audio(`assets/audio/letters/${letter}.mp3`);
+            audio.preload = 'auto';
+            this.letterAudio.set(letter, audio);
+        });
+
         // Pre-load voices if possible
         this.voice = null;
         if (this.synth.onvoiceschanged !== undefined) {
@@ -31,14 +39,30 @@ export class AudioManager {
     playLetterSound(letter) {
         if (!this.soundsEnabled) return;
 
+        const normalizedLetter = letter.toLowerCase();
+        const letterClip = this.letterAudio.get(normalizedLetter);
+
+        if (letterClip) {
+            // Keep letter clips snappy and avoid overlap buildup.
+            letterClip.currentTime = 0;
+            letterClip.play().catch(() => {
+                // Browser autoplay protections can still block playback.
+                this.playLetterFallback(normalizedLetter);
+            });
+            return;
+        }
+
+        this.playLetterFallback(normalizedLetter);
+    }
+
+    playLetterFallback(letter) {
         // Cancel current speech to avoid queue buildup
         this.synth.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(letter.toLowerCase());
+        const utterance = new SpeechSynthesisUtterance(letter);
         if (this.voice) utterance.voice = this.voice;
 
-        // Adjust properties for a more natural letter sound if possible
-        // Note: True phonemes are hard with TTS, but we do our best.
+        // True phonemes are hard with TTS, but this keeps a fallback path.
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
 
@@ -47,11 +71,6 @@ export class AudioManager {
 
     playSuccess() {
         if (!this.soundsEnabled) return;
-
-        // Simple success chime using Web Audio API would be better, 
-        // but for now let's use a cheerful TTS message or just a placeholder.
-        // Let's generate a simple beep for now using AudioContext if we wanted, 
-        // but sticking to TTS for consistency as per spec option.
 
         const utterance = new SpeechSynthesisUtterance("Excellent!");
         if (this.voice) utterance.voice = this.voice;
