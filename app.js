@@ -17,7 +17,14 @@ class App {
             prefix: '',
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
-            completedWords: Storage.get('readstar_completed', [])
+            completedWords: Storage.get('readstar_completed', []),
+            letterCrunch: {
+                scores: { 1: 0, 2: 0 },
+                currentPlayer: 1,
+                currentLetter: this.getRandomLetter(),
+                isListening: false,
+                status: 'Player 1, hold your side and say the letter.'
+            }
         };
 
         // Sync audio settings
@@ -33,7 +40,12 @@ class App {
     }
 
     bindEvents() {
-        this.ui.on('enterApp', () => this.ui.showMainApp());
+        this.ui.on('openReadstar', () => this.ui.showMainApp());
+        this.ui.on('openLetterCrunch', () => {
+            this.ui.showLetterCrunchApp();
+            this.renderLetterCrunch();
+        });
+        this.ui.on('showHome', () => this.ui.showHome());
         this.ui.on('letterClick', (letter) => this.handleLetterClick(letter));
         this.ui.on('back', () => this.handleBack());
         this.ui.on('clear', () => this.handleClear());
@@ -80,6 +92,10 @@ class App {
             Storage.set('readstar_speech', enabled);
             this.audio.setSpeechPromptsEnabled(enabled);
         });
+
+        this.ui.on('letterCrunchHoldStart', (player) => this.handleLetterCrunchHoldStart(player));
+        this.ui.on('letterCrunchHoldEnd', (player) => this.handleLetterCrunchHoldEnd(player));
+        this.ui.on('resetLetterCrunch', () => this.resetLetterCrunch());
     }
 
     handleLetterClick(letter) {
@@ -150,12 +166,134 @@ class App {
         }, 1500);
     }
 
+    handleLetterCrunchHoldStart(player) {
+        const game = this.state.letterCrunch;
+        if (player !== game.currentPlayer || game.isListening) return;
+
+        if (!this.speech.isSupported) {
+            game.status = "Speech recognition isn't supported in this browser.";
+            this.renderLetterCrunch();
+            return;
+        }
+
+        game.isListening = true;
+        game.status = `Listening... Player ${player}, say "${game.currentLetter.toUpperCase()}".`;
+        this.renderLetterCrunch();
+
+        this.speech.start(
+            (transcript) => {
+                game.isListening = false;
+                this.handleLetterCrunchGuess(transcript, player);
+            },
+            (error) => {
+                game.isListening = false;
+                game.status = `Couldn't hear that (${error}). Player ${player}, try again.`;
+                this.renderLetterCrunch();
+            }
+        );
+    }
+
+    handleLetterCrunchHoldEnd(player) {
+        const game = this.state.letterCrunch;
+        if (player !== game.currentPlayer || !game.isListening) return;
+        this.speech.stop();
+    }
+
+    handleLetterCrunchGuess(transcript, player) {
+        const game = this.state.letterCrunch;
+        const spoken = this.normalizeLetterGuess(transcript);
+        const target = game.currentLetter;
+
+        if (spoken === target) {
+            game.scores[player] += 1;
+            game.status = `Nice! Player ${player} got ${target.toUpperCase()} correct.`;
+            this.ui.animateCrunch(player);
+            this.audio.playSuccess();
+            game.currentLetter = this.getRandomLetter();
+        } else {
+            game.status = `Heard "${transcript}". Needed "${target.toUpperCase()}".`;
+            this.audio.playFailure();
+        }
+
+        game.currentPlayer = game.currentPlayer === 1 ? 2 : 1;
+        game.status += ` Player ${game.currentPlayer}, your turn.`;
+        this.renderLetterCrunch();
+    }
+
+    normalizeLetterGuess(transcript) {
+        const cleaned = transcript.toLowerCase().trim().replace(/[^a-z\s]/g, '');
+        if (!cleaned) return '';
+        const collapsed = cleaned.replace(/\s+/g, ' ');
+        const words = collapsed.split(' ');
+        const lastWord = words[words.length - 1];
+
+        const phoneticMap = {
+            a: ['a', 'ay', 'eh'],
+            b: ['b', 'bee', 'be'],
+            c: ['c', 'cee', 'see'],
+            d: ['d', 'dee'],
+            e: ['e'],
+            f: ['f', 'ef'],
+            g: ['g', 'gee'],
+            h: ['h', 'aitch', 'hitch'],
+            i: ['i', 'eye'],
+            j: ['j', 'jay'],
+            k: ['k', 'kay'],
+            l: ['l', 'el'],
+            m: ['m', 'em'],
+            n: ['n', 'en'],
+            o: ['o', 'oh'],
+            p: ['p', 'pee'],
+            q: ['q', 'cue', 'queue'],
+            r: ['r', 'are'],
+            s: ['s', 'ess'],
+            t: ['t', 'tee', 'tea'],
+            u: ['u', 'you'],
+            v: ['v', 'vee'],
+            w: ['w', 'doubleyou', 'double'],
+            x: ['x', 'ex'],
+            y: ['y', 'why'],
+            z: ['z', 'zee', 'zed']
+        };
+
+        const singleChar = lastWord.replace(/\s/g, '');
+        if (singleChar.length === 1 && /[a-z]/.test(singleChar)) {
+            return singleChar;
+        }
+
+        for (const [letter, options] of Object.entries(phoneticMap)) {
+            if (options.includes(lastWord)) return letter;
+        }
+        return '';
+    }
+
+    getRandomLetter() {
+        const letters = 'abcdefghijklmnopqrstuvwxyz';
+        return letters[Math.floor(Math.random() * letters.length)];
+    }
+
+    resetLetterCrunch() {
+        this.state.letterCrunch = {
+            scores: { 1: 0, 2: 0 },
+            currentPlayer: 1,
+            currentLetter: this.getRandomLetter(),
+            isListening: false,
+            status: 'Player 1, hold your side and say the letter.'
+        };
+        this.renderLetterCrunch();
+    }
+
+    renderLetterCrunch() {
+        this.ui.updateLetterCrunch(this.state.letterCrunch);
+    }
+
     render() {
         const validNext = this.wordManager.getValidNextLetters(this.state.prefix);
         const isComplete = this.wordManager.isCompleteWord(this.state.prefix);
 
         this.ui.updatePrefix(this.state.prefix, isComplete);
         this.ui.renderGrid(validNext);
+        this.renderLetterCrunch();
     }
 }
 

@@ -2,7 +2,10 @@ export class UIManager {
     constructor() {
         this.introScreen = document.getElementById('intro-screen');
         this.introTitle = document.getElementById('intro-title');
+        this.btnOpenReadstar = document.getElementById('btn-open-readstar');
+        this.btnOpenLetterCrunch = document.getElementById('btn-open-letter-crunch');
         this.mainApp = document.getElementById('main-app');
+        this.letterCrunchApp = document.getElementById('letter-crunch-app');
         this.grid = document.getElementById('letter-grid');
         this.prefixDisplay = document.getElementById('prefix-display');
         this.btnBack = document.getElementById('btn-back');
@@ -12,6 +15,16 @@ export class UIManager {
         this.settingsModal = document.getElementById('settings-modal');
         this.btnRead = document.getElementById('btn-read');
         this.actionArea = document.getElementById('action-area');
+        this.btnLetterCrunchHome = document.getElementById('btn-letter-crunch-home');
+        this.btnLetterCrunchReset = document.getElementById('btn-letter-crunch-reset');
+        this.player1Score = document.getElementById('player1-score');
+        this.player2Score = document.getElementById('player2-score');
+        this.letterCrunchLetter = document.getElementById('letter-crunch-letter');
+        this.letterCrunchStatus = document.getElementById('letter-crunch-status');
+        this.leftCrocodile = document.getElementById('left-crocodile');
+        this.rightCrocodile = document.getElementById('right-crocodile');
+        this.btnPlayer1 = document.getElementById('btn-player1');
+        this.btnPlayer2 = document.getElementById('btn-player2');
 
         // Settings elements
         this.wordListInput = document.getElementById('word-list-input');
@@ -28,13 +41,8 @@ export class UIManager {
     }
 
     bindInternalEvents() {
-        this.introTitle.addEventListener('click', () => this.emit('enterApp'));
-        this.introTitle.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                this.emit('enterApp');
-            }
-        });
+        this.btnOpenReadstar.addEventListener('click', () => this.emit('openReadstar'));
+        this.btnOpenLetterCrunch.addEventListener('click', () => this.emit('openLetterCrunch'));
 
         this.btnBack.addEventListener('click', () => this.emit('back'));
         this.btnClear.addEventListener('click', () => this.emit('clear'));
@@ -52,6 +60,22 @@ export class UIManager {
 
         this.toggleSounds.addEventListener('change', (e) => this.emit('toggleSounds', e.target.checked));
         this.toggleSpeechPrompts.addEventListener('change', (e) => this.emit('toggleSpeechPrompts', e.target.checked));
+
+        this.btnLetterCrunchHome.addEventListener('click', () => this.emit('showHome'));
+        this.btnLetterCrunchReset.addEventListener('click', () => this.emit('resetLetterCrunch'));
+
+        this.btnPlayer1.addEventListener('pointerdown', () => this.emit('letterCrunchHoldStart', 1));
+        this.btnPlayer2.addEventListener('pointerdown', () => this.emit('letterCrunchHoldStart', 2));
+        this.btnPlayer1.addEventListener('pointerup', () => this.emit('letterCrunchHoldEnd', 1));
+        this.btnPlayer2.addEventListener('pointerup', () => this.emit('letterCrunchHoldEnd', 2));
+        this.btnPlayer1.addEventListener('pointercancel', () => this.emit('letterCrunchHoldEnd', 1));
+        this.btnPlayer2.addEventListener('pointercancel', () => this.emit('letterCrunchHoldEnd', 2));
+        this.btnPlayer1.addEventListener('pointerleave', (event) => {
+            if (event.buttons === 1) this.emit('letterCrunchHoldEnd', 1);
+        });
+        this.btnPlayer2.addEventListener('pointerleave', (event) => {
+            if (event.buttons === 1) this.emit('letterCrunchHoldEnd', 2);
+        });
     }
 
     on(event, callback) {
@@ -115,6 +139,40 @@ export class UIManager {
 
     showMainApp() {
         this.introScreen.classList.add('hidden');
+        this.letterCrunchApp.classList.add('hidden');
         this.mainApp.classList.remove('hidden');
+    }
+
+    showLetterCrunchApp() {
+        this.introScreen.classList.add('hidden');
+        this.mainApp.classList.add('hidden');
+        this.letterCrunchApp.classList.remove('hidden');
+    }
+
+    showHome() {
+        this.introScreen.classList.remove('hidden');
+        this.mainApp.classList.add('hidden');
+        this.letterCrunchApp.classList.add('hidden');
+    }
+
+    updateLetterCrunch(state) {
+        this.letterCrunchLetter.textContent = state.currentLetter.toUpperCase();
+        this.player1Score.textContent = `Player 1: ${state.scores[1]}`;
+        this.player2Score.textContent = `Player 2: ${state.scores[2]}`;
+        this.player1Score.classList.toggle('active', state.currentPlayer === 1);
+        this.player2Score.classList.toggle('active', state.currentPlayer === 2);
+        this.letterCrunchStatus.textContent = state.status;
+        this.btnPlayer1.disabled = state.currentPlayer !== 1 || state.isListening;
+        this.btnPlayer2.disabled = state.currentPlayer !== 2 || state.isListening;
+        this.btnPlayer1.classList.toggle('listening', state.currentPlayer === 1 && state.isListening);
+        this.btnPlayer2.classList.toggle('listening', state.currentPlayer === 2 && state.isListening);
+    }
+
+    animateCrunch(player) {
+        const target = player === 1 ? this.leftCrocodile : this.rightCrocodile;
+        target.classList.remove('snap');
+        // Restart animation by forcing reflow
+        void target.offsetWidth;
+        target.classList.add('snap');
     }
 }
