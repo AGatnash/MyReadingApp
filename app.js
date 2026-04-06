@@ -36,6 +36,7 @@ class App {
 
     init() {
         this.bindEvents();
+        this.ui.showHome();
         this.render();
     }
 
@@ -111,6 +112,8 @@ class App {
         if (this.state.prefix.length > 0) {
             this.state.prefix = this.state.prefix.slice(0, -1);
             this.render();
+        } else {
+            this.ui.showHome();
         }
     }
 
