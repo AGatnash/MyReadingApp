@@ -5,6 +5,50 @@ import { AudioManager } from './modules/AudioManager.js';
 import { SpeechRecognizer } from './modules/SpeechRecognizer.js';
 import { Confetti } from './modules/Confetti.js';
 
+const PHONETIC_MAP = {
+    a: ['a', 'ay', 'eh', 'hey', 'aye'],
+    b: ['b', 'bee', 'be', 'bea'],
+    c: ['c', 'cee', 'see', 'sea', 'si'],
+    d: ['d', 'dee', 'de', 'dea', 'the'],
+    e: ['e', 'ee', 'he', 'hee', 'me', 'the'],
+    f: ['f', 'ef', 'eff'],
+    g: ['g', 'gee', 'ji', 'jee'],
+    h: ['h', 'aitch', 'hitch', 'age', 'ache', 'each', 'aich', 'eight'],
+    i: ['i', 'eye', 'aye', 'ai'],
+    j: ['j', 'jay', 'je', 'jae'],
+    k: ['k', 'kay', 'okay', 'kaye', 'ka'],
+    l: ['l', 'el', 'ale', 'elle', 'ell'],
+    m: ['m', 'em', 'him', 'am'],
+    n: ['n', 'en', 'and', 'in', 'an', 'end'],
+    o: ['o', 'oh', 'owe', 'ooh'],
+    p: ['p', 'pee', 'pe', 'pi'],
+    q: ['q', 'cue', 'queue', 'kew', 'kyu'],
+    r: ['r', 'are', 'ar', 'our'],
+    s: ['s', 'ess', 'es', 'as'],
+    t: ['t', 'tee', 'tea', 'ti', 'te'],
+    u: ['u', 'you', 'yu', 'ew'],
+    v: ['v', 'vee', 've', 'vi'],
+    w: ['w', 'doubleyou', 'double', 'dub'],
+    x: ['x', 'ex', 'eggs', 'ecks'],
+    y: ['y', 'why', 'wie'],
+    z: ['z', 'zee', 'zed', 'ze', 'said']
+};
+
+function levenshteinDistance(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = a[i - 1] === b[j - 1]
+                ? dp[i - 1][j - 1]
+                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+    }
+    return dp[m][n];
+}
+
 class App {
     constructor() {
         this.wordManager = new WordManager();
@@ -204,8 +248,8 @@ class App {
 
     handleLetterCrunchGuess(transcript, player) {
         const game = this.state.letterCrunch;
-        const spoken = this.normalizeLetterGuess(transcript);
         const target = game.currentLetter;
+        const spoken = this.normalizeLetterGuess(transcript, target);
 
         if (spoken === target) {
             game.scores[player] += 1;
@@ -223,50 +267,45 @@ class App {
         this.renderLetterCrunch();
     }
 
-    normalizeLetterGuess(transcript) {
+    normalizeLetterGuess(transcript, targetLetter) {
         const cleaned = transcript.toLowerCase().trim().replace(/[^a-z\s]/g, '');
         if (!cleaned) return '';
-        const collapsed = cleaned.replace(/\s+/g, ' ');
-        const words = collapsed.split(' ');
-        const lastWord = words[words.length - 1];
 
-        const phoneticMap = {
-            a: ['a', 'ay', 'eh'],
-            b: ['b', 'bee', 'be'],
-            c: ['c', 'cee', 'see'],
-            d: ['d', 'dee'],
-            e: ['e'],
-            f: ['f', 'ef'],
-            g: ['g', 'gee'],
-            h: ['h', 'aitch', 'hitch'],
-            i: ['i', 'eye'],
-            j: ['j', 'jay'],
-            k: ['k', 'kay'],
-            l: ['l', 'el'],
-            m: ['m', 'em'],
-            n: ['n', 'en'],
-            o: ['o', 'oh'],
-            p: ['p', 'pee'],
-            q: ['q', 'cue', 'queue'],
-            r: ['r', 'are'],
-            s: ['s', 'ess'],
-            t: ['t', 'tee', 'tea'],
-            u: ['u', 'you'],
-            v: ['v', 'vee'],
-            w: ['w', 'doubleyou', 'double'],
-            x: ['x', 'ex'],
-            y: ['y', 'why'],
-            z: ['z', 'zee', 'zed']
-        };
+        const words = cleaned.replace(/\s+/g, ' ').split(' ');
+        const fullCollapsed = cleaned.replace(/\s+/g, '');
+        const targetVariants = PHONETIC_MAP[targetLetter] || [targetLetter];
 
-        const singleChar = lastWord.replace(/\s/g, '');
-        if (singleChar.length === 1 && /[a-z]/.test(singleChar)) {
-            return singleChar;
+        // Pass 1: Exact match against target variants (any word)
+        for (const word of words) {
+            if (targetVariants.includes(word)) return targetLetter;
         }
 
-        for (const [letter, options] of Object.entries(phoneticMap)) {
-            if (options.includes(lastWord)) return letter;
+        // Pass 2: Single-char match for target
+        for (const word of words) {
+            if (word.length === 1 && word === targetLetter) return targetLetter;
         }
+
+        // Pass 3: Fuzzy match against target variants
+        for (const word of words) {
+            for (const variant of targetVariants) {
+                if (variant.length >= 2 && (word.startsWith(variant) || word.endsWith(variant))) {
+                    return targetLetter;
+                }
+                if (levenshteinDistance(word, variant) <= 1) return targetLetter;
+            }
+        }
+
+        // Pass 4: Collapsed transcript against target variants (e.g. "double you" for W)
+        if (targetVariants.includes(fullCollapsed)) return targetLetter;
+
+        // Pass 5: Fallback — identify if a different letter was spoken
+        for (const word of words) {
+            if (word.length === 1 && /[a-z]/.test(word)) return word;
+            for (const [letter, variants] of Object.entries(PHONETIC_MAP)) {
+                if (variants.includes(word)) return letter;
+            }
+        }
+
         return '';
     }
 
