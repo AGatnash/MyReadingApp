@@ -62,6 +62,7 @@ class App {
             isBlending: false,
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
+            speechRecognitionEnabled: Storage.get('readstar_speech_check', true),
             filterEnabled: Storage.get('readstar_filter', true),
             completedWords: Storage.get('readstar_completed', []),
             letterCrunch: {
@@ -82,8 +83,15 @@ class App {
 
     init() {
         this.bindEvents();
+        this.syncSpeechAvailability();
         this.ui.showHome();
         this.render();
+    }
+
+    // The microphone check is offered only when the browser supports it AND
+    // the parent hasn't switched it off.
+    syncSpeechAvailability() {
+        this.ui.setSpeechAvailable(this.speech.isSupported && this.state.speechRecognitionEnabled);
     }
 
     bindEvents() {
@@ -99,6 +107,7 @@ class App {
         this.ui.on('clear', () => this.handleClear());
         this.ui.on('read', () => this.handleRead());
         this.ui.on('soundOut', () => this.handleSoundOut());
+        this.ui.on('complete', () => this.handleManualComplete());
 
         this.ui.on('openSettings', () => {
             this.ui.populateSettings(
@@ -107,6 +116,7 @@ class App {
                 {
                     soundsEnabled: this.state.soundsEnabled,
                     speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    speechRecognitionEnabled: this.state.speechRecognitionEnabled,
                     filterEnabled: this.state.filterEnabled
                 }
             );
@@ -130,6 +140,7 @@ class App {
                 {
                     soundsEnabled: this.state.soundsEnabled,
                     speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    speechRecognitionEnabled: this.state.speechRecognitionEnabled,
                     filterEnabled: this.state.filterEnabled
                 }
             );
@@ -145,6 +156,13 @@ class App {
             this.state.speechPromptsEnabled = enabled;
             Storage.set('readstar_speech', enabled);
             this.audio.setSpeechPromptsEnabled(enabled);
+        });
+
+        this.ui.on('toggleSpeechRecognition', (enabled) => {
+            this.state.speechRecognitionEnabled = enabled;
+            Storage.set('readstar_speech_check', enabled);
+            this.syncSpeechAvailability();
+            this.render();
         });
 
         this.ui.on('toggleLetterFilter', (enabled) => {
@@ -289,35 +307,60 @@ class App {
 
     handleRead() {
         if (this.state.isBlending) return;
-        if (!this.speech.isSupported) {
-            alert("Speech recognition is not supported in this browser.");
-            return;
-        }
+        // The mic button is only shown when speech is available, but guard
+        // anyway and fail silently (the manual "I read it" button still works).
+        if (!this.speech.isSupported || !this.state.speechRecognitionEnabled) return;
 
         this.ui.btnRead.classList.add('listening');
 
         this.speech.start(
-            (transcript) => {
+            (transcripts) => {
                 this.ui.btnRead.classList.remove('listening');
-                this.verifySpokenWord(transcript);
+                this.verifySpokenWord(transcripts);
             },
             (error) => {
                 this.ui.btnRead.classList.remove('listening');
                 console.error("Speech error:", error);
+                this.audio.playFailure();
             }
         );
     }
 
-    verifySpokenWord(transcript) {
+    // Forgiving match: accept the word if ANY recognizer alternative contains a
+    // token that equals the target or is within a small edit distance of it.
+    // Uses whole-word tokens (not substrings) so short targets like "at" are no
+    // longer falsely matched by "cat", while still tolerating children's
+    // mispronunciations and the recognizer mishearing them.
+    verifySpokenWord(transcripts) {
         const target = this.currentWord().toLowerCase();
-        const spoken = transcript.toLowerCase().trim();
+        // Edit-distance tolerance scaled to word length. Short CVC words use 0
+        // (so "at" is never matched by "cat"); longer words tolerate a slip or
+        // two. Forgiveness comes mainly from checking all recognizer
+        // alternatives and the always-available manual "I read it" button.
+        const tolerance = target.length <= 3 ? 0 : (target.length <= 6 ? 1 : 2);
 
-        console.log(`Target: ${target}, Spoken: ${spoken}`);
+        const matched = transcripts.some(transcript => {
+            const tokens = transcript.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/);
+            return tokens.some(token =>
+                token.length > 0 && levenshteinDistance(token, target) <= tolerance);
+        });
 
-        if (spoken.includes(target) || target.includes(spoken)) {
+        console.log(`Target: ${target}, Heard: [${transcripts.join(' | ')}], Match: ${matched}`);
+
+        if (matched) {
             this.handleWordComplete(target);
         } else {
             this.audio.playFailure();
+        }
+    }
+
+    // Adult "they read it" tap — completes the word without the mic. Always
+    // available, and the only completion path when speech is off/unsupported.
+    handleManualComplete() {
+        if (this.state.isBlending) return;
+        const word = this.currentWord();
+        if (this.wordManager.isCompleteWord(word)) {
+            this.handleWordComplete(word);
         }
     }
 
@@ -350,9 +393,9 @@ class App {
         this.renderLetterCrunch();
 
         this.speech.start(
-            (transcript) => {
+            (transcripts) => {
                 game.isListening = false;
-                this.handleLetterCrunchGuess(transcript, player);
+                this.handleLetterCrunchGuess(transcripts, player);
             },
             (error) => {
                 game.isListening = false;
@@ -368,19 +411,20 @@ class App {
         this.speech.stop();
     }
 
-    handleLetterCrunchGuess(transcript, player) {
+    handleLetterCrunchGuess(transcripts, player) {
         const game = this.state.letterCrunch;
         const target = game.currentLetter;
-        const spoken = this.normalizeLetterGuess(transcript, target);
+        // Accept if any recognizer alternative normalizes to the target letter.
+        const correct = transcripts.some(t => this.normalizeLetterGuess(t, target) === target);
 
-        if (spoken === target) {
+        if (correct) {
             game.scores[player] += 1;
             game.status = `Nice! Player ${player} got ${target.toUpperCase()} correct.`;
             this.ui.animateCrunch(player);
             this.audio.playSuccess();
             game.currentLetter = this.getRandomLetter();
         } else {
-            game.status = `Heard "${transcript}". Needed "${target.toUpperCase()}".`;
+            game.status = `Heard "${transcripts[0] || ''}". Needed "${target.toUpperCase()}".`;
             this.audio.playFailure();
         }
 

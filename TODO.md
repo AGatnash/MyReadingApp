@@ -46,9 +46,12 @@ phonics) and Montessori reading practice.
       (sounds) with Letter Crunch (letter names); consistent lowercase.
 - [ ] **Teacher/parent dashboard** — per-GPC mastery, spaced review of weak
       sounds; turn the completed-words log into real formative assessment.
-- [ ] **Make speech recognition optional & forgiving** — adult "they read it"
-      tap; tighten the loose `includes` match so e.g. "at" isn't matched by
-      "cat".
+- [x] **Make speech recognition optional & forgiving** — added a manual "I read
+      it" tick (always available; the only path when speech is off/unsupported),
+      a "Listen for Reading" settings toggle, and graceful degradation when the
+      browser lacks speech support. Replaced the loose `includes` match with
+      whole-word, length-scaled edit-distance matching across all recognizer
+      alternatives (maxAlternatives=5), so "at" is no longer matched by "cat".
 - [ ] **Self-correcting, non-competitive solo mode** alongside Letter Crunch
       (Montessori alignment).
 

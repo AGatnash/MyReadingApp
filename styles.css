@@ -370,6 +370,17 @@ header {
     animation: pulse 1s infinite alternate;
 }
 
+/* Listen (microphone) button — blue, distinct from the green "done" check */
+.listen-btn {
+    background: var(--primary-color);
+    border-color: var(--primary-dark);
+    box-shadow: 0 0.8vh 0 var(--primary-dark);
+}
+
+.listen-btn:active {
+    box-shadow: 0 2px 0 var(--primary-dark);
+}
+
 /* Sound-it-out (blending) button */
 .sound-btn {
     background: var(--accent-color);

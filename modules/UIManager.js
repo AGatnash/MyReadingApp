@@ -19,7 +19,10 @@ export class UIManager {
         this.settingsModal = document.getElementById('settings-modal');
         this.btnRead = document.getElementById('btn-read');
         this.btnSoundOut = document.getElementById('btn-sound-out');
+        this.btnComplete = document.getElementById('btn-complete');
         this.actionArea = document.getElementById('action-area');
+        // Whether the microphone "Read this word" button should be offered.
+        this.speechAvailable = true;
         this.btnLetterCrunchHome = document.getElementById('btn-letter-crunch-home');
         this.btnLetterCrunchReset = document.getElementById('btn-letter-crunch-reset');
         this.player1Score = document.getElementById('player1-score');
@@ -38,6 +41,7 @@ export class UIManager {
         this.btnClearLog = document.getElementById('btn-clear-log');
         this.toggleSounds = document.getElementById('toggle-sounds');
         this.toggleSpeechPrompts = document.getElementById('toggle-speech-prompts');
+        this.toggleSpeechRecognition = document.getElementById('toggle-speech-recognition');
         this.toggleLetterFilter = document.getElementById('toggle-letter-filter');
 
         this.callbacks = {};
@@ -54,6 +58,7 @@ export class UIManager {
         this.btnClear.addEventListener('click', () => this.emit('clear'));
         this.btnRead.addEventListener('click', () => this.emit('read'));
         this.btnSoundOut.addEventListener('click', () => this.emit('soundOut'));
+        this.btnComplete.addEventListener('click', () => this.emit('complete'));
 
         this.btnSettings.addEventListener('click', () => this.toggleSettings(true));
         this.btnCloseSettings.addEventListener('click', () => this.toggleSettings(false));
@@ -67,6 +72,7 @@ export class UIManager {
 
         this.toggleSounds.addEventListener('change', (e) => this.emit('toggleSounds', e.target.checked));
         this.toggleSpeechPrompts.addEventListener('change', (e) => this.emit('toggleSpeechPrompts', e.target.checked));
+        this.toggleSpeechRecognition.addEventListener('change', (e) => this.emit('toggleSpeechRecognition', e.target.checked));
         this.toggleLetterFilter.addEventListener('change', (e) => this.emit('toggleLetterFilter', e.target.checked));
 
         this.btnLevelHome.addEventListener('click', () => this.emit('showHome'));
@@ -133,12 +139,20 @@ export class UIManager {
         this.prefixDisplay.className = graphemes.length > 0 ? '' : 'empty';
         if (isComplete) {
             this.prefixDisplay.classList.add('complete');
-            this.btnRead.classList.remove('hidden');
+            // Sound it out and manual "I read it" are always available; the
+            // microphone check only appears when speech is on and supported.
             this.btnSoundOut.classList.remove('hidden');
+            this.btnComplete.classList.remove('hidden');
+            this.btnRead.classList.toggle('hidden', !this.speechAvailable);
         } else {
             this.btnRead.classList.add('hidden');
             this.btnSoundOut.classList.add('hidden');
+            this.btnComplete.classList.add('hidden');
         }
+    }
+
+    setSpeechAvailable(available) {
+        this.speechAvailable = available;
     }
 
     highlightLetter(index) {
@@ -160,6 +174,7 @@ export class UIManager {
         this.btnSoundOut.classList.toggle('blending', active);
         this.btnSoundOut.disabled = active;
         this.btnRead.disabled = active;
+        this.btnComplete.disabled = active;
     }
 
     toggleSettings(show) {
@@ -180,6 +195,7 @@ export class UIManager {
 
         this.toggleSounds.checked = settings.soundsEnabled;
         this.toggleSpeechPrompts.checked = settings.speechPromptsEnabled;
+        this.toggleSpeechRecognition.checked = settings.speechRecognitionEnabled;
         this.toggleLetterFilter.checked = settings.filterEnabled;
     }
 

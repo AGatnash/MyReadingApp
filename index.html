@@ -77,13 +77,19 @@
                         <path d="M18.5 5.5a9 9 0 0 1 0 13" />
                     </svg>
                 </button>
-                <button id="btn-read" class="action-btn hidden" aria-label="Read this word">
+                <button id="btn-read" class="action-btn listen-btn hidden" aria-label="Read this word">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                         <line x1="12" y1="19" x2="12" y2="23" />
                         <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                </button>
+                <button id="btn-complete" class="action-btn hidden" aria-label="I read it">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </button>
             </div>
@@ -152,6 +158,10 @@
                     <label class="toggle">
                         <input type="checkbox" id="toggle-speech-prompts" checked>
                         <span>Speech Prompts</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggle-speech-recognition" checked>
+                        <span>Listen for Reading (microphone check)</span>
                     </label>
                     <label class="toggle">
                         <input type="checkbox" id="toggle-letter-filter" checked>
