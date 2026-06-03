@@ -34,6 +34,12 @@ const PHONETIC_MAP = {
     z: ['z', 'zee', 'zed', 'ze', 'said']
 };
 
+// Fraction of a level's words a child must read to "master" it and unlock the
+// next level. Below 100% on purpose: with a flaky mic (or a couple of stubborn
+// words) requiring every single word could stall a learner. They can still go
+// back and finish the rest.
+const MASTERY_RATIO = 0.8;
+
 function levenshteinDistance(a, b) {
     const m = a.length, n = b.length;
     const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
@@ -223,7 +229,7 @@ class App {
             const spellings = this.wordManager.spellingsOf(level.words);
             const got = spellings.filter(w => completed.has(w)).length;
             const total = spellings.length;
-            const mastered = total > 0 && got === total;
+            const mastered = total > 0 && got >= Math.ceil(total * MASTERY_RATIO);
             vms.push({
                 id: level.id,
                 name: level.name,

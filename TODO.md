@@ -56,9 +56,10 @@ phonics) and Montessori reading practice.
       (Montessori alignment).
 
 ### Tuning / polish
-- [ ] **Mastery threshold** — currently 100% of a level's words via speech
-      recognition (e.g. all 19 in Level 2), which may stall a real learner.
-      Consider ~80%, or count a word as "read" when blended via Sound it out.
+- [x] **Mastery threshold** — a level now unlocks the next at 80% of its words
+      read (`MASTERY_RATIO` in `app.js`), not 100%, so a flaky mic or a couple of
+      stubborn words can't stall a learner; they can still go back and finish.
+      Completion counts words read via the mic OR the manual "I read it" tap.
 - [ ] Consistent letter case across ReadStar (lowercase) and Letter Crunch
       (uppercase).
 - [ ] Allow dot-segmented graphemes in the Custom word list (advanced) so
