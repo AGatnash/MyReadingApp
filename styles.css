@@ -214,6 +214,7 @@ header {
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 5vmin;
     margin-bottom: 1vh;
     transition: all 0.3s ease;
 }
@@ -249,6 +250,37 @@ header {
     border-color: #991B1B;
     box-shadow: 0 8px 0 #991B1B;
     animation: pulse 1s infinite alternate;
+}
+
+/* Sound-it-out (blending) button */
+.sound-btn {
+    background: var(--accent-color);
+    border-color: #B45309;
+    box-shadow: 0 0.8vh 0 #B45309;
+}
+
+.sound-btn:active {
+    box-shadow: 0 2px 0 #B45309;
+}
+
+.sound-btn.blending {
+    animation: pulse 1s infinite alternate;
+}
+
+.sound-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Per-letter blending highlight in the prefix display */
+.prefix-letter {
+    display: inline-block;
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.prefix-letter.blending {
+    color: var(--accent-color);
+    transform: scale(1.25) translateY(-0.08em);
 }
 
 @keyframes pulse {

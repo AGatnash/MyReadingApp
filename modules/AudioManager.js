@@ -69,6 +69,20 @@ export class AudioManager {
         this.synth.speak(utterance);
     }
 
+    speakWord(word) {
+        if (!this.soundsEnabled) return;
+
+        // Cancel any queued speech so the blended word lands cleanly.
+        this.synth.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(word);
+        if (this.voice) utterance.voice = this.voice;
+        // Slightly slower so the whole-word blend stays clear for a beginner.
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        this.synth.speak(utterance);
+    }
+
     playSuccess() {
         if (!this.soundsEnabled) return;
 

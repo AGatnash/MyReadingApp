@@ -59,6 +59,7 @@ class App {
 
         this.state = {
             prefix: '',
+            isBlending: false,
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
             filterEnabled: Storage.get('readstar_filter', true),
@@ -96,6 +97,7 @@ class App {
         this.ui.on('back', () => this.handleBack());
         this.ui.on('clear', () => this.handleClear());
         this.ui.on('read', () => this.handleRead());
+        this.ui.on('soundOut', () => this.handleSoundOut());
 
         this.ui.on('openSettings', () => {
             this.ui.populateSettings(
@@ -153,6 +155,7 @@ class App {
     }
 
     handleLetterClick(letter) {
+        if (this.state.isBlending) return;
         // With the guide filter on, only letters that continue a real word are
         // accepted. With it off, any letter is accepted so the child must
         // choose by sound (and can make — and hear — their own mistakes).
@@ -165,6 +168,7 @@ class App {
     }
 
     handleBack() {
+        if (this.state.isBlending) return;
         if (this.state.prefix.length > 0) {
             this.state.prefix = this.state.prefix.slice(0, -1);
             this.render();
@@ -174,11 +178,41 @@ class App {
     }
 
     handleClear() {
+        if (this.state.isBlending) return;
         this.state.prefix = '';
         this.render();
     }
 
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async handleSoundOut() {
+        const word = this.state.prefix;
+        if (this.state.isBlending || !word) return;
+
+        this.state.isBlending = true;
+        this.ui.setBlending(true);
+
+        // Step 1: highlight and sound each letter in turn (c ... a ... t).
+        for (let i = 0; i < word.length; i++) {
+            this.ui.highlightLetter(i);
+            this.audio.playLetterSound(word[i]);
+            await this.delay(850);
+        }
+
+        // Step 2: blend — light up the whole word and say it as one.
+        this.ui.highlightWholeWord();
+        this.audio.speakWord(word);
+        await this.delay(1200);
+
+        this.ui.clearBlendHighlight();
+        this.ui.setBlending(false);
+        this.state.isBlending = false;
+    }
+
     handleRead() {
+        if (this.state.isBlending) return;
         if (!this.speech.isSupported) {
             alert("Speech recognition is not supported in this browser.");
             return;

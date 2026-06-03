@@ -14,6 +14,7 @@ export class UIManager {
         this.btnCloseSettings = document.getElementById('btn-close-settings');
         this.settingsModal = document.getElementById('settings-modal');
         this.btnRead = document.getElementById('btn-read');
+        this.btnSoundOut = document.getElementById('btn-sound-out');
         this.actionArea = document.getElementById('action-area');
         this.btnLetterCrunchHome = document.getElementById('btn-letter-crunch-home');
         this.btnLetterCrunchReset = document.getElementById('btn-letter-crunch-reset');
@@ -48,6 +49,7 @@ export class UIManager {
         this.btnBack.addEventListener('click', () => this.emit('back'));
         this.btnClear.addEventListener('click', () => this.emit('clear'));
         this.btnRead.addEventListener('click', () => this.emit('read'));
+        this.btnSoundOut.addEventListener('click', () => this.emit('soundOut'));
 
         this.btnSettings.addEventListener('click', () => this.toggleSettings(true));
         this.btnCloseSettings.addEventListener('click', () => this.toggleSettings(false));
@@ -111,14 +113,45 @@ export class UIManager {
     }
 
     updatePrefix(prefix, isComplete) {
-        this.prefixDisplay.textContent = prefix;
+        // Render each letter as its own span so the blending ("sound it out")
+        // sequence can highlight letters one at a time.
+        this.prefixDisplay.innerHTML = '';
+        for (const ch of prefix) {
+            const span = document.createElement('span');
+            span.className = 'prefix-letter';
+            span.textContent = ch;
+            this.prefixDisplay.appendChild(span);
+        }
         this.prefixDisplay.className = prefix ? '' : 'empty';
         if (isComplete) {
             this.prefixDisplay.classList.add('complete');
             this.btnRead.classList.remove('hidden');
+            this.btnSoundOut.classList.remove('hidden');
         } else {
             this.btnRead.classList.add('hidden');
+            this.btnSoundOut.classList.add('hidden');
         }
+    }
+
+    highlightLetter(index) {
+        const letters = this.prefixDisplay.querySelectorAll('.prefix-letter');
+        letters.forEach((el, i) => el.classList.toggle('blending', i === index));
+    }
+
+    highlightWholeWord() {
+        this.prefixDisplay.querySelectorAll('.prefix-letter')
+            .forEach(el => el.classList.add('blending'));
+    }
+
+    clearBlendHighlight() {
+        this.prefixDisplay.querySelectorAll('.prefix-letter')
+            .forEach(el => el.classList.remove('blending'));
+    }
+
+    setBlending(active) {
+        this.btnSoundOut.classList.toggle('blending', active);
+        this.btnSoundOut.disabled = active;
+        this.btnRead.disabled = active;
     }
 
     toggleSettings(show) {
