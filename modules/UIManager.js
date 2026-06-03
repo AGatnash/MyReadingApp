@@ -98,17 +98,18 @@ export class UIManager {
         }
     }
 
-    renderGrid(validLetters, filterEnabled = true) {
+    renderGrid(inventory, validGraphemes, filterEnabled = true) {
         this.grid.innerHTML = '';
-        this.alphabet.forEach(letter => {
+        inventory.forEach(grapheme => {
             const btn = document.createElement('button');
             btn.className = 'letter-btn';
-            btn.textContent = letter;
+            if (grapheme.length > 1) btn.classList.add('digraph');
+            btn.textContent = grapheme;
 
-            // When the guide filter is off, every letter is selectable so the
-            // child chooses by sound instead of following the only lit button.
-            if (!filterEnabled || validLetters.has(letter)) {
-                btn.onclick = () => this.emit('letterClick', letter);
+            // When the guide filter is off, every tile is selectable so the
+            // child chooses by sound instead of following the only lit tile.
+            if (!filterEnabled || validGraphemes.has(grapheme)) {
+                btn.onclick = () => this.emit('graphemeClick', grapheme);
             } else {
                 btn.classList.add('disabled');
                 btn.disabled = true;
@@ -118,17 +119,18 @@ export class UIManager {
         });
     }
 
-    updatePrefix(prefix, isComplete) {
-        // Render each letter as its own span so the blending ("sound it out")
-        // sequence can highlight letters one at a time.
+    updatePrefix(graphemes, isComplete) {
+        // Render each grapheme as its own span so the blending ("sound it out")
+        // sequence can highlight one sound at a time (digraphs stay together).
         this.prefixDisplay.innerHTML = '';
-        for (const ch of prefix) {
+        for (const g of graphemes) {
             const span = document.createElement('span');
             span.className = 'prefix-letter';
-            span.textContent = ch;
+            if (g.length > 1) span.classList.add('digraph');
+            span.textContent = g;
             this.prefixDisplay.appendChild(span);
         }
-        this.prefixDisplay.className = prefix ? '' : 'empty';
+        this.prefixDisplay.className = graphemes.length > 0 ? '' : 'empty';
         if (isComplete) {
             this.prefixDisplay.classList.add('complete');
             this.btnRead.classList.remove('hidden');

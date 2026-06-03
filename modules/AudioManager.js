@@ -12,6 +12,10 @@ export class AudioManager {
             this.letterAudio.set(letter, audio);
         });
 
+        // Multi-letter grapheme clips (sh, ch, th, ee, ...) are loaded lazily
+        // from assets/audio/graphemes/<grapheme>.mp3 the first time they play.
+        this.graphemeAudio = new Map();
+
         // Pre-load voices if possible
         this.voice = null;
         if (this.synth.onvoiceschanged !== undefined) {
@@ -36,30 +40,46 @@ export class AudioManager {
         this.speechPromptsEnabled = enabled;
     }
 
-    playLetterSound(letter) {
+    // Play the sound for any grapheme — a single letter or a digraph/trigraph.
+    playGraphemeSound(grapheme) {
         if (!this.soundsEnabled) return;
 
-        const normalizedLetter = letter.toLowerCase();
-        const letterClip = this.letterAudio.get(normalizedLetter);
+        const g = grapheme.toLowerCase();
 
-        if (letterClip) {
-            // Keep letter clips snappy and avoid overlap buildup.
-            letterClip.currentTime = 0;
-            letterClip.play().catch(() => {
-                // Browser autoplay protections can still block playback.
-                this.playLetterFallback(normalizedLetter);
-            });
+        // Single letters use the bundled per-letter phoneme clips.
+        if (g.length === 1) {
+            const letterClip = this.letterAudio.get(g);
+            if (letterClip) {
+                letterClip.currentTime = 0;
+                letterClip.play().catch(() => this.playGraphemeFallback(g));
+                return;
+            }
+            this.playGraphemeFallback(g);
             return;
         }
 
-        this.playLetterFallback(normalizedLetter);
+        // Multi-letter graphemes: load (and cache) an optional clip; if it is
+        // missing or blocked, fall back to spoken synthesis.
+        let clip = this.graphemeAudio.get(g);
+        if (!clip) {
+            clip = new Audio(`assets/audio/graphemes/${g}.mp3`);
+            clip.preload = 'auto';
+            this.graphemeAudio.set(g, clip);
+        }
+        clip.currentTime = 0;
+        clip.play().catch(() => this.playGraphemeFallback(g));
     }
 
-    playLetterFallback(letter) {
+    // Backwards-compatible alias.
+    playLetterSound(letter) {
+        this.playGraphemeSound(letter);
+    }
+
+    playGraphemeFallback(grapheme) {
         // Cancel current speech to avoid queue buildup
         this.synth.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(letter);
+        const utterance = new SpeechSynthesisUtterance(grapheme);
         if (this.voice) utterance.voice = this.voice;
 
         // True phonemes are hard with TTS, but this keeps a fallback path.

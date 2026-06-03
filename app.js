@@ -58,7 +58,7 @@ class App {
         this.confetti = new Confetti();
 
         this.state = {
-            prefix: '',
+            graphemes: [],
             isBlending: false,
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
@@ -94,7 +94,7 @@ class App {
             this.renderLetterCrunch();
         });
         this.ui.on('showHome', () => this.ui.showHome());
-        this.ui.on('letterClick', (letter) => this.handleLetterClick(letter));
+        this.ui.on('graphemeClick', (grapheme) => this.handleGraphemeClick(grapheme));
         this.ui.on('back', () => this.handleBack());
         this.ui.on('clear', () => this.handleClear());
         this.ui.on('read', () => this.handleRead());
@@ -158,23 +158,27 @@ class App {
         this.ui.on('resetLetterCrunch', () => this.resetLetterCrunch());
     }
 
-    handleLetterClick(letter) {
+    currentWord() {
+        return this.state.graphemes.join('');
+    }
+
+    handleGraphemeClick(grapheme) {
         if (this.state.isBlending) return;
-        // With the guide filter on, only letters that continue a real word are
-        // accepted. With it off, any letter is accepted so the child must
+        // With the guide filter on, only graphemes that continue a real word
+        // are accepted. With it off, any tile is accepted so the child must
         // choose by sound (and can make — and hear — their own mistakes).
-        if (this.state.filterEnabled && !this.wordManager.isValidNextLetter(this.state.prefix, letter)) {
+        if (this.state.filterEnabled && !this.wordManager.isValidNextGrapheme(this.currentWord(), grapheme)) {
             return;
         }
-        this.state.prefix = this.state.prefix + letter;
+        this.state.graphemes.push(grapheme);
         this.render();
-        this.audio.playLetterSound(letter);
+        this.audio.playGraphemeSound(grapheme);
     }
 
     handleBack() {
         if (this.state.isBlending) return;
-        if (this.state.prefix.length > 0) {
-            this.state.prefix = this.state.prefix.slice(0, -1);
+        if (this.state.graphemes.length > 0) {
+            this.state.graphemes.pop();
             this.render();
         } else {
             // Backing out of an empty word returns to the level picker.
@@ -196,8 +200,11 @@ class App {
         let prevMastered = true; // Level 1 is always unlocked.
 
         for (const level of this.wordManager.getLevels()) {
-            const got = level.words.filter(w => completed.has(w)).length;
-            const total = level.words.length;
+            // level.words may carry grapheme separators (e.g. "sh.i.p");
+            // compare against plain spellings, which is what gets logged.
+            const spellings = this.wordManager.spellingsOf(level.words);
+            const got = spellings.filter(w => completed.has(w)).length;
+            const total = spellings.length;
             const mastered = total > 0 && got === total;
             vms.push({
                 id: level.id,
@@ -229,7 +236,7 @@ class App {
 
     handleSelectLevel(id) {
         this.wordManager.setActiveLevel(id);
-        this.state.prefix = '';
+        this.state.graphemes = [];
         this.updateLevelBanner();
         this.ui.showMainApp();
         this.render();
@@ -247,7 +254,7 @@ class App {
 
     handleClear() {
         if (this.state.isBlending) return;
-        this.state.prefix = '';
+        this.state.graphemes = [];
         this.render();
     }
 
@@ -256,16 +263,17 @@ class App {
     }
 
     async handleSoundOut() {
-        const word = this.state.prefix;
+        const graphemes = this.state.graphemes;
+        const word = this.currentWord();
         if (this.state.isBlending || !word) return;
 
         this.state.isBlending = true;
         this.ui.setBlending(true);
 
-        // Step 1: highlight and sound each letter in turn (c ... a ... t).
-        for (let i = 0; i < word.length; i++) {
+        // Step 1: highlight and sound each grapheme in turn (sh ... i ... p).
+        for (let i = 0; i < graphemes.length; i++) {
             this.ui.highlightLetter(i);
-            this.audio.playLetterSound(word[i]);
+            this.audio.playGraphemeSound(graphemes[i]);
             await this.delay(850);
         }
 
@@ -301,13 +309,13 @@ class App {
     }
 
     verifySpokenWord(transcript) {
-        const target = this.state.prefix.toLowerCase();
+        const target = this.currentWord().toLowerCase();
         const spoken = transcript.toLowerCase().trim();
 
         console.log(`Target: ${target}, Spoken: ${spoken}`);
 
         if (spoken.includes(target) || target.includes(spoken)) {
-            this.handleWordComplete(this.state.prefix);
+            this.handleWordComplete(target);
         } else {
             this.audio.playFailure();
         }
@@ -444,11 +452,12 @@ class App {
     }
 
     render() {
-        const validNext = this.wordManager.getValidNextLetters(this.state.prefix);
-        const isComplete = this.wordManager.isCompleteWord(this.state.prefix);
+        const prefix = this.currentWord();
+        const validNext = this.wordManager.getValidNextGraphemes(prefix);
+        const isComplete = this.wordManager.isCompleteWord(prefix);
 
-        this.ui.updatePrefix(this.state.prefix, isComplete);
-        this.ui.renderGrid(validNext, this.state.filterEnabled);
+        this.ui.updatePrefix(this.state.graphemes, isComplete);
+        this.ui.renderGrid(this.wordManager.getGraphemeInventory(), validNext, this.state.filterEnabled);
         this.renderLetterCrunch();
     }
 }

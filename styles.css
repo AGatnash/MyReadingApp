@@ -456,6 +456,17 @@ main {
     box-shadow: 0 0 0 transparent;
 }
 
+/* Multi-letter grapheme tiles (sh, ch, ee, ...) need a smaller font to fit. */
+.letter-btn.digraph {
+    font-size: 2rem;
+    letter-spacing: 0.02em;
+}
+
+.prefix-letter.digraph {
+    /* Keep digraphs visually grouped as one sound in the word display. */
+    margin: 0 0.02em;
+}
+
 .letter-btn.vowel {
     background: var(--vowel-bg);
     color: var(--vowel-text);
