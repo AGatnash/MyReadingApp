@@ -18,6 +18,7 @@
             <p>Choose a game</p>
             <div id="game-menu">
                 <button id="btn-open-readstar" class="menu-btn">ReadStar</button>
+                <button id="btn-open-build" class="menu-btn">Build a Word</button>
                 <button id="btn-open-letter-crunch" class="menu-btn">Letter Crunch</button>
             </div>
         </section>
@@ -40,6 +41,17 @@
 
         <div id="main-app" class="hidden">
             <div id="level-banner"></div>
+            <div id="build-prompt" class="hidden">
+                <span class="build-prompt-text">Build the word you hear</span>
+                <button id="btn-hear-word" class="control-btn" aria-label="Hear the word again">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                    </svg>
+                </button>
+            </div>
             <header>
                 <div id="prefix-display" class="empty"></div>
             </header>
@@ -87,6 +99,12 @@
                     </svg>
                 </button>
                 <button id="btn-complete" class="action-btn hidden" aria-label="I read it">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </button>
+                <button id="btn-check" class="action-btn hidden" aria-label="Check my word">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="20 6 9 17 4 12" />

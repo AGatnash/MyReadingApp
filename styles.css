@@ -237,6 +237,26 @@ body {
     color: var(--accent-color);
 }
 
+/* Build (Movable Alphabet) prompt */
+#build-prompt {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 1vh;
+}
+
+.build-prompt-text {
+    font-weight: 700;
+    font-size: clamp(1rem, 3.5vmin, 1.5rem);
+    color: var(--accent-color);
+}
+
+#btn-hear-word {
+    color: var(--accent-color);
+}
+
 /* Level banner in the word builder */
 #level-banner {
     flex: 0 0 auto;

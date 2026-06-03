@@ -3,6 +3,7 @@ export class UIManager {
         this.introScreen = document.getElementById('intro-screen');
         this.introTitle = document.getElementById('intro-title');
         this.btnOpenReadstar = document.getElementById('btn-open-readstar');
+        this.btnOpenBuild = document.getElementById('btn-open-build');
         this.btnOpenLetterCrunch = document.getElementById('btn-open-letter-crunch');
         this.mainApp = document.getElementById('main-app');
         this.letterCrunchApp = document.getElementById('letter-crunch-app');
@@ -20,6 +21,9 @@ export class UIManager {
         this.btnRead = document.getElementById('btn-read');
         this.btnSoundOut = document.getElementById('btn-sound-out');
         this.btnComplete = document.getElementById('btn-complete');
+        this.btnCheck = document.getElementById('btn-check');
+        this.buildPrompt = document.getElementById('build-prompt');
+        this.btnHearWord = document.getElementById('btn-hear-word');
         this.actionArea = document.getElementById('action-area');
         // Whether the microphone "Read this word" button should be offered.
         this.speechAvailable = true;
@@ -52,6 +56,7 @@ export class UIManager {
 
     bindInternalEvents() {
         this.btnOpenReadstar.addEventListener('click', () => this.emit('openReadstar'));
+        this.btnOpenBuild.addEventListener('click', () => this.emit('openBuild'));
         this.btnOpenLetterCrunch.addEventListener('click', () => this.emit('openLetterCrunch'));
 
         this.btnBack.addEventListener('click', () => this.emit('back'));
@@ -59,6 +64,8 @@ export class UIManager {
         this.btnRead.addEventListener('click', () => this.emit('read'));
         this.btnSoundOut.addEventListener('click', () => this.emit('soundOut'));
         this.btnComplete.addEventListener('click', () => this.emit('complete'));
+        this.btnCheck.addEventListener('click', () => this.emit('check'));
+        this.btnHearWord.addEventListener('click', () => this.emit('hearWord'));
 
         this.btnSettings.addEventListener('click', () => this.toggleSettings(true));
         this.btnCloseSettings.addEventListener('click', () => this.toggleSettings(false));
@@ -125,7 +132,7 @@ export class UIManager {
         });
     }
 
-    updatePrefix(graphemes, isComplete) {
+    updatePrefix(graphemes, showComplete) {
         // Render each grapheme as its own span so the blending ("sound it out")
         // sequence can highlight one sound at a time (digraphs stay together).
         this.prefixDisplay.innerHTML = '';
@@ -137,18 +144,27 @@ export class UIManager {
             this.prefixDisplay.appendChild(span);
         }
         this.prefixDisplay.className = graphemes.length > 0 ? '' : 'empty';
-        if (isComplete) {
-            this.prefixDisplay.classList.add('complete');
-            // Sound it out and manual "I read it" are always available; the
-            // microphone check only appears when speech is on and supported.
-            this.btnSoundOut.classList.remove('hidden');
-            this.btnComplete.classList.remove('hidden');
-            this.btnRead.classList.toggle('hidden', !this.speechAvailable);
-        } else {
-            this.btnRead.classList.add('hidden');
-            this.btnSoundOut.classList.add('hidden');
-            this.btnComplete.classList.add('hidden');
-        }
+        // Only the read activity reveals correctness with the green styling;
+        // Build mode must not give away whether the attempt is right.
+        if (showComplete) this.prefixDisplay.classList.add('complete');
+    }
+
+    // Show the right action buttons for the current activity.
+    //   read  mode: Sound it out + (mic) + "I read it", once a word is formed.
+    //   build mode: Sound it out + Check, once any tiles are placed.
+    updateActions({ mode, isComplete, hasContent }) {
+        const buildMode = mode === 'build';
+        this.buildPrompt.classList.toggle('hidden', !buildMode);
+
+        const showRead = !buildMode && isComplete && this.speechAvailable;
+        const showComplete = !buildMode && isComplete;
+        const showCheck = buildMode && hasContent;
+        const showSoundOut = buildMode ? hasContent : isComplete;
+
+        this.btnRead.classList.toggle('hidden', !showRead);
+        this.btnComplete.classList.toggle('hidden', !showComplete);
+        this.btnCheck.classList.toggle('hidden', !showCheck);
+        this.btnSoundOut.classList.toggle('hidden', !showSoundOut);
     }
 
     setSpeechAvailable(available) {
@@ -175,6 +191,7 @@ export class UIManager {
         this.btnSoundOut.disabled = active;
         this.btnRead.disabled = active;
         this.btnComplete.disabled = active;
+        this.btnCheck.disabled = active;
     }
 
     toggleSettings(show) {

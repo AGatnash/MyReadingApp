@@ -36,8 +36,12 @@ phonics) and Montessori reading practice.
 ### Pedagogy gaps (from the evaluation, not yet built)
 - [ ] **Phonemic-awareness pre-reading mode** — oral I-spy, rhyming, and
       blend/segment games with audio only (no letters yet).
-- [ ] **Encoding-first "Movable Alphabet" mode** — app says a word (or shows a
-      picture); child builds it from sound. Trains sound -> grapheme.
+- [x] **Encoding-first "Movable Alphabet" mode** — "Build a Word" activity on
+      the home menu. The app says a target word (replayable via the speaker
+      button); the child builds it from the full tile board (no guide filter,
+      no correctness reveal) and taps Check. Accepts single-letter or digraph
+      spellings; successes count toward level mastery. Picture prompts are a
+      separate item below.
 - [ ] **Meaning & comprehension** — picture per word, then decodable phrases /
       sentences, building toward simple decodable mini-books.
 - [ ] **Multisensory letter formation** — sandpaper-letter-style finger tracing

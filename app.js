@@ -65,6 +65,8 @@ class App {
 
         this.state = {
             graphemes: [],
+            mode: 'read',      // 'read' (ReadStar) or 'build' (Movable Alphabet)
+            target: null,      // target spelling to build, in build mode
             isBlending: false,
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
@@ -101,7 +103,14 @@ class App {
     }
 
     bindEvents() {
-        this.ui.on('openReadstar', () => this.showLevelSelectScreen());
+        this.ui.on('openReadstar', () => {
+            this.state.mode = 'read';
+            this.showLevelSelectScreen();
+        });
+        this.ui.on('openBuild', () => {
+            this.state.mode = 'build';
+            this.showLevelSelectScreen();
+        });
         this.ui.on('selectLevel', (id) => this.handleSelectLevel(id));
         this.ui.on('openLetterCrunch', () => {
             this.ui.showLetterCrunchApp();
@@ -114,6 +123,8 @@ class App {
         this.ui.on('read', () => this.handleRead());
         this.ui.on('soundOut', () => this.handleSoundOut());
         this.ui.on('complete', () => this.handleManualComplete());
+        this.ui.on('check', () => this.handleCheck());
+        this.ui.on('hearWord', () => this.handleHearWord());
 
         this.ui.on('openSettings', () => {
             this.ui.populateSettings(
@@ -188,10 +199,12 @@ class App {
 
     handleGraphemeClick(grapheme) {
         if (this.state.isBlending) return;
-        // With the guide filter on, only graphemes that continue a real word
-        // are accepted. With it off, any tile is accepted so the child must
-        // choose by sound (and can make — and hear — their own mistakes).
-        if (this.state.filterEnabled && !this.wordManager.isValidNextGrapheme(this.currentWord(), grapheme)) {
+        // In read mode with the guide filter on, only graphemes that continue a
+        // real word are accepted. With the filter off — and always in build
+        // mode (Movable Alphabet) — any tile is accepted so the child chooses by
+        // sound and can make (and hear) their own mistakes.
+        if (this.state.mode === 'read' && this.state.filterEnabled &&
+            !this.wordManager.isValidNextGrapheme(this.currentWord(), grapheme)) {
             return;
         }
         this.state.graphemes.push(grapheme);
@@ -263,7 +276,47 @@ class App {
         this.state.graphemes = [];
         this.updateLevelBanner();
         this.ui.showMainApp();
+        if (this.state.mode === 'build') {
+            this.startBuildRound();
+        } else {
+            this.render();
+        }
+    }
+
+    // Movable Alphabet: pick a target word, clear the board, say it aloud.
+    startBuildRound() {
+        const words = this.wordManager.getWords();
+        if (words.length === 0) return;
+        let next = words[Math.floor(Math.random() * words.length)];
+        if (words.length > 1) {
+            while (next === this.state.target) {
+                next = words[Math.floor(Math.random() * words.length)];
+            }
+        }
+        this.state.target = next;
+        this.state.graphemes = [];
         this.render();
+        this.audio.speakWord(next);
+    }
+
+    handleHearWord() {
+        if (this.state.target) this.audio.speakWord(this.state.target);
+    }
+
+    handleCheck() {
+        if (this.state.isBlending) return;
+        const built = this.currentWord();
+        if (!built) return;
+
+        if (built === this.state.target) {
+            this.audio.playSuccess();
+            this.recordCompletion(built);
+            setTimeout(() => this.startBuildRound(), 1500);
+        } else {
+            // Gentle: don't reveal the answer or wipe the board — let the child
+            // self-correct with Back/Clear, and offer the word again.
+            this.audio.playFailure();
+        }
     }
 
     updateLevelBanner() {
@@ -370,12 +423,17 @@ class App {
         }
     }
 
-    handleWordComplete(word) {
-        this.audio.playSuccess();
+    // Celebrate and log a word read/built (drives the completed-words log and
+    // level mastery, regardless of which activity or completion path produced it).
+    recordCompletion(word) {
         this.confetti.start();
-
         this.state.completedWords.unshift(word);
         Storage.set('readstar_completed', this.state.completedWords);
+    }
+
+    handleWordComplete(word) {
+        this.audio.playSuccess();
+        this.recordCompletion(word);
 
         setTimeout(() => {
             if (confirm(`Great job! You read "${word}". Start a new word?`)) {
@@ -502,12 +560,24 @@ class App {
     }
 
     render() {
-        const prefix = this.currentWord();
-        const validNext = this.wordManager.getValidNextGraphemes(prefix);
-        const isComplete = this.wordManager.isCompleteWord(prefix);
+        const inventory = this.wordManager.getGraphemeInventory();
+        const hasContent = this.state.graphemes.length > 0;
 
-        this.ui.updatePrefix(this.state.graphemes, isComplete);
-        this.ui.renderGrid(this.wordManager.getGraphemeInventory(), validNext, this.state.filterEnabled);
+        if (this.state.mode === 'build') {
+            // Full board, no filtering or correctness reveal — the child must
+            // choose each grapheme from the sounds they hear.
+            this.ui.updatePrefix(this.state.graphemes, false);
+            this.ui.renderGrid(inventory, new Set(), false);
+            this.ui.updateActions({ mode: 'build', isComplete: false, hasContent });
+        } else {
+            const prefix = this.currentWord();
+            const validNext = this.wordManager.getValidNextGraphemes(prefix);
+            const isComplete = this.wordManager.isCompleteWord(prefix);
+            this.ui.updatePrefix(this.state.graphemes, isComplete);
+            this.ui.renderGrid(inventory, validNext, this.state.filterEnabled);
+            this.ui.updateActions({ mode: 'read', isComplete, hasContent });
+        }
+
         this.renderLetterCrunch();
     }
 }
