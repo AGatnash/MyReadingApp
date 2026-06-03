@@ -61,6 +61,7 @@ class App {
             prefix: '',
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
+            filterEnabled: Storage.get('readstar_filter', true),
             completedWords: Storage.get('readstar_completed', []),
             letterCrunch: {
                 scores: { 1: 0, 2: 0 },
@@ -102,7 +103,8 @@ class App {
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
-                    speechPromptsEnabled: this.state.speechPromptsEnabled
+                    speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    filterEnabled: this.state.filterEnabled
                 }
             );
         });
@@ -121,7 +123,8 @@ class App {
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
-                    speechPromptsEnabled: this.state.speechPromptsEnabled
+                    speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    filterEnabled: this.state.filterEnabled
                 }
             );
         });
@@ -138,18 +141,27 @@ class App {
             this.audio.setSpeechPromptsEnabled(enabled);
         });
 
+        this.ui.on('toggleLetterFilter', (enabled) => {
+            this.state.filterEnabled = enabled;
+            Storage.set('readstar_filter', enabled);
+            this.render();
+        });
+
         this.ui.on('letterCrunchHoldStart', (player) => this.handleLetterCrunchHoldStart(player));
         this.ui.on('letterCrunchHoldEnd', (player) => this.handleLetterCrunchHoldEnd(player));
         this.ui.on('resetLetterCrunch', () => this.resetLetterCrunch());
     }
 
     handleLetterClick(letter) {
-        const newPrefix = this.state.prefix + letter;
-        if (this.wordManager.isValidNextLetter(this.state.prefix, letter)) {
-            this.state.prefix = newPrefix;
-            this.render();
-            this.audio.playLetterSound(letter);
+        // With the guide filter on, only letters that continue a real word are
+        // accepted. With it off, any letter is accepted so the child must
+        // choose by sound (and can make — and hear — their own mistakes).
+        if (this.state.filterEnabled && !this.wordManager.isValidNextLetter(this.state.prefix, letter)) {
+            return;
         }
+        this.state.prefix = this.state.prefix + letter;
+        this.render();
+        this.audio.playLetterSound(letter);
     }
 
     handleBack() {
@@ -334,7 +346,7 @@ class App {
         const isComplete = this.wordManager.isCompleteWord(this.state.prefix);
 
         this.ui.updatePrefix(this.state.prefix, isComplete);
-        this.ui.renderGrid(validNext);
+        this.ui.renderGrid(validNext, this.state.filterEnabled);
         this.renderLetterCrunch();
     }
 }

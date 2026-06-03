@@ -33,6 +33,7 @@ export class UIManager {
         this.btnClearLog = document.getElementById('btn-clear-log');
         this.toggleSounds = document.getElementById('toggle-sounds');
         this.toggleSpeechPrompts = document.getElementById('toggle-speech-prompts');
+        this.toggleLetterFilter = document.getElementById('toggle-letter-filter');
 
         this.callbacks = {};
         this.alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -60,6 +61,7 @@ export class UIManager {
 
         this.toggleSounds.addEventListener('change', (e) => this.emit('toggleSounds', e.target.checked));
         this.toggleSpeechPrompts.addEventListener('change', (e) => this.emit('toggleSpeechPrompts', e.target.checked));
+        this.toggleLetterFilter.addEventListener('change', (e) => this.emit('toggleLetterFilter', e.target.checked));
 
         this.btnLetterCrunchHome.addEventListener('click', () => this.emit('showHome'));
         this.btnLetterCrunchReset.addEventListener('click', () => this.emit('resetLetterCrunch'));
@@ -88,14 +90,16 @@ export class UIManager {
         }
     }
 
-    renderGrid(validLetters) {
+    renderGrid(validLetters, filterEnabled = true) {
         this.grid.innerHTML = '';
         this.alphabet.forEach(letter => {
             const btn = document.createElement('button');
             btn.className = 'letter-btn';
             btn.textContent = letter;
 
-            if (validLetters.has(letter)) {
+            // When the guide filter is off, every letter is selectable so the
+            // child chooses by sound instead of following the only lit button.
+            if (!filterEnabled || validLetters.has(letter)) {
                 btn.onclick = () => this.emit('letterClick', letter);
             } else {
                 btn.classList.add('disabled');
@@ -135,6 +139,7 @@ export class UIManager {
 
         this.toggleSounds.checked = settings.soundsEnabled;
         this.toggleSpeechPrompts.checked = settings.speechPromptsEnabled;
+        this.toggleLetterFilter.checked = settings.filterEnabled;
     }
 
     showMainApp() {
