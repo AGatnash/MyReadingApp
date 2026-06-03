@@ -22,12 +22,14 @@ phonics) and Montessori reading practice.
 ## To Do
 
 ### Audio
-- [ ] **Record digraph phoneme clips** for Levels 7-10. Drop pure-phoneme MP3s
-      into `assets/audio/graphemes/` (`sh.mp3`, `ch.mp3`, `th.mp3`, `ng.mp3`,
-      `ck.mp3`, `ee.mp3`, `oo.mp3`, `ai.mp3`, `oa.mp3`). Until then those levels
-      fall back to speech synthesis, which spells the digraph out (e.g.
-      "ess-aitch") instead of saying the /sh/ sound. See
-      `assets/audio/graphemes/README.md`.
+- [ ] **Record the 8 digraph phoneme clips** for Levels 7-10:
+      `sh ch th ng ee oo ai oa`. Workflow is ready — record one track of the
+      sounds (in that order, in the same voice as the letter clips) and run
+      `python3 modules/split_grapheme_sounds.py grapheme_sounds.mp3`. See
+      `assets/audio/graphemes/README.md`. Until done, those graphemes fall back
+      to speech synthesis (spells the digraph out, e.g. "ess-aitch").
+- [x] **`ck` clip** — done; `ck.mp3` is a copy of `letters/k.mp3` (same /k/
+      sound, same voice).
 - [ ] Verify the bundled per-letter clips are "pure" phonemes (/c/ /a/ /t/, not
       "cuh-ay-tuh") so the letter-by-letter blend stays clean.
 
