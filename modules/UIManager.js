@@ -6,6 +6,10 @@ export class UIManager {
         this.btnOpenLetterCrunch = document.getElementById('btn-open-letter-crunch');
         this.mainApp = document.getElementById('main-app');
         this.letterCrunchApp = document.getElementById('letter-crunch-app');
+        this.levelSelect = document.getElementById('level-select');
+        this.levelGrid = document.getElementById('level-grid');
+        this.levelBanner = document.getElementById('level-banner');
+        this.btnLevelHome = document.getElementById('btn-level-home');
         this.grid = document.getElementById('letter-grid');
         this.prefixDisplay = document.getElementById('prefix-display');
         this.btnBack = document.getElementById('btn-back');
@@ -64,6 +68,8 @@ export class UIManager {
         this.toggleSounds.addEventListener('change', (e) => this.emit('toggleSounds', e.target.checked));
         this.toggleSpeechPrompts.addEventListener('change', (e) => this.emit('toggleSpeechPrompts', e.target.checked));
         this.toggleLetterFilter.addEventListener('change', (e) => this.emit('toggleLetterFilter', e.target.checked));
+
+        this.btnLevelHome.addEventListener('click', () => this.emit('showHome'));
 
         this.btnLetterCrunchHome.addEventListener('click', () => this.emit('showHome'));
         this.btnLetterCrunchReset.addEventListener('click', () => this.emit('resetLetterCrunch'));
@@ -175,22 +181,73 @@ export class UIManager {
         this.toggleLetterFilter.checked = settings.filterEnabled;
     }
 
-    showMainApp() {
+    hideAllScreens() {
         this.introScreen.classList.add('hidden');
+        this.levelSelect.classList.add('hidden');
+        this.mainApp.classList.add('hidden');
         this.letterCrunchApp.classList.add('hidden');
+    }
+
+    showMainApp() {
+        this.hideAllScreens();
         this.mainApp.classList.remove('hidden');
     }
 
     showLetterCrunchApp() {
-        this.introScreen.classList.add('hidden');
-        this.mainApp.classList.add('hidden');
+        this.hideAllScreens();
         this.letterCrunchApp.classList.remove('hidden');
     }
 
     showHome() {
+        this.hideAllScreens();
         this.introScreen.classList.remove('hidden');
-        this.mainApp.classList.add('hidden');
-        this.letterCrunchApp.classList.add('hidden');
+    }
+
+    showLevelSelect() {
+        this.hideAllScreens();
+        this.levelSelect.classList.remove('hidden');
+    }
+
+    setLevelBanner(text) {
+        this.levelBanner.textContent = text;
+    }
+
+    // Render the level cards from view-models:
+    // { id, name, letters, got, total, mastered, locked, isCustom }
+    renderLevelSelect(levels) {
+        this.levelGrid.innerHTML = '';
+        levels.forEach(level => {
+            const card = document.createElement('button');
+            card.className = 'level-card';
+            if (level.locked) card.classList.add('locked');
+            if (level.mastered) card.classList.add('mastered');
+            if (level.isCustom) card.classList.add('custom');
+
+            let progressText;
+            if (level.locked) {
+                progressText = '🔒 Locked';
+            } else if (level.isCustom) {
+                progressText = `${level.total} words`;
+            } else {
+                progressText = level.mastered
+                    ? `★ ${level.got}/${level.total}`
+                    : `${level.got}/${level.total}`;
+            }
+
+            card.innerHTML = `
+                <span class="level-name">${level.name}</span>
+                <span class="level-letters">${level.letters}</span>
+                <span class="level-progress">${progressText}</span>
+            `;
+
+            if (level.locked) {
+                card.disabled = true;
+            } else {
+                card.addEventListener('click', () => this.emit('selectLevel', level.id));
+            }
+
+            this.levelGrid.appendChild(card);
+        });
     }
 
     updateLetterCrunch(state) {

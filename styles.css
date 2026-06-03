@@ -130,6 +130,124 @@ body {
     flex-direction: column;
 }
 
+/* Level Select */
+#level-select {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.level-select-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+}
+
+.level-select-header h2 {
+    text-align: center;
+    font-size: clamp(1.8rem, 6vmin, 3rem);
+}
+
+.control-spacer {
+    width: clamp(40px, 10vmin, 64px);
+}
+
+#level-grid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    padding: 4px;
+    align-content: start;
+}
+
+.level-card {
+    border: 4px solid var(--text-color);
+    border-radius: 20px;
+    background: var(--surface-color);
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
+    padding: 18px 16px;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.level-card:active {
+    transform: translateY(4px);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.level-card .level-name {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.level-card .level-letters {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--primary-color);
+}
+
+.level-card .level-progress {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #64748B;
+}
+
+.level-card.mastered {
+    border-color: var(--success-color);
+    box-shadow: 0 8px 0 #065F46;
+}
+
+.level-card.mastered .level-progress {
+    color: var(--success-color);
+}
+
+.level-card.locked {
+    cursor: not-allowed;
+    opacity: 0.55;
+    background: #E2E8F0;
+    border-color: #94A3B8;
+    box-shadow: 0 8px 0 #94A3B8;
+}
+
+.level-card.locked .level-letters {
+    color: #94A3B8;
+}
+
+.level-card.custom {
+    border-style: dashed;
+    border-color: var(--accent-color);
+    box-shadow: 0 8px 0 #B45309;
+}
+
+.level-card.custom .level-letters {
+    color: var(--accent-color);
+}
+
+/* Level banner in the word builder */
+#level-banner {
+    flex: 0 0 auto;
+    text-align: center;
+    font-weight: 700;
+    font-size: clamp(0.9rem, 3vmin, 1.2rem);
+    color: var(--primary-color);
+    margin-bottom: 1vh;
+    min-height: 1.2em;
+}
+
 /* Header & Prefix */
 /* Header & Prefix */
 header {

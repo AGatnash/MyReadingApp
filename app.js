@@ -87,7 +87,8 @@ class App {
     }
 
     bindEvents() {
-        this.ui.on('openReadstar', () => this.ui.showMainApp());
+        this.ui.on('openReadstar', () => this.showLevelSelectScreen());
+        this.ui.on('selectLevel', (id) => this.handleSelectLevel(id));
         this.ui.on('openLetterCrunch', () => {
             this.ui.showLetterCrunchApp();
             this.renderLetterCrunch();
@@ -101,7 +102,7 @@ class App {
 
         this.ui.on('openSettings', () => {
             this.ui.populateSettings(
-                this.wordManager.getWords(),
+                this.wordManager.getCustomWords(),
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
@@ -113,7 +114,10 @@ class App {
 
         this.ui.on('saveWords', (text) => {
             const words = text.split('\n');
-            this.wordManager.setWords(words);
+            this.wordManager.setCustomWords(words);
+            // Editing the word list switches play to the Custom level.
+            this.wordManager.setActiveLevel('custom');
+            this.updateLevelBanner();
             this.handleClear(); // Reset state on word list change
         });
 
@@ -121,7 +125,7 @@ class App {
             this.state.completedWords = [];
             Storage.set('readstar_completed', []);
             this.ui.populateSettings(
-                this.wordManager.getWords(),
+                this.wordManager.getCustomWords(),
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
@@ -173,8 +177,72 @@ class App {
             this.state.prefix = this.state.prefix.slice(0, -1);
             this.render();
         } else {
-            this.ui.showHome();
+            // Backing out of an empty word returns to the level picker.
+            this.showLevelSelectScreen();
         }
+    }
+
+    showLevelSelectScreen() {
+        this.ui.renderLevelSelect(this.buildLevelViewModels());
+        this.ui.showLevelSelect();
+    }
+
+    // A level is mastered when every one of its words has been completed.
+    // Each level unlocks only once the previous one is mastered; "Custom"
+    // (the editable list) is always available.
+    buildLevelViewModels() {
+        const completed = new Set(this.state.completedWords);
+        const vms = [];
+        let prevMastered = true; // Level 1 is always unlocked.
+
+        for (const level of this.wordManager.getLevels()) {
+            const got = level.words.filter(w => completed.has(w)).length;
+            const total = level.words.length;
+            const mastered = total > 0 && got === total;
+            vms.push({
+                id: level.id,
+                name: level.name,
+                letters: level.letters,
+                got,
+                total,
+                mastered,
+                locked: !prevMastered,
+                isCustom: false
+            });
+            prevMastered = mastered;
+        }
+
+        const custom = this.wordManager.getCustomWords();
+        vms.push({
+            id: 'custom',
+            name: 'Custom',
+            letters: '✎',
+            got: 0,
+            total: custom.length,
+            mastered: false,
+            locked: false,
+            isCustom: true
+        });
+
+        return vms;
+    }
+
+    handleSelectLevel(id) {
+        this.wordManager.setActiveLevel(id);
+        this.state.prefix = '';
+        this.updateLevelBanner();
+        this.ui.showMainApp();
+        this.render();
+    }
+
+    updateLevelBanner() {
+        const id = this.wordManager.getActiveLevel();
+        if (id === 'custom') {
+            this.ui.setLevelBanner('Custom Words');
+            return;
+        }
+        const level = this.wordManager.getLevels().find(l => l.id === id);
+        this.ui.setLevelBanner(level ? `${level.name} · ${level.letters.toUpperCase()}` : '');
     }
 
     handleClear() {

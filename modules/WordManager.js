@@ -4,45 +4,99 @@ export class WordManager {
     constructor() {
         this.words = new Set();
         this.prefixMap = new Map();
-        // Default words follow a systematic synthetic-phonics sequence
+
+        // Built-in levels follow a systematic synthetic-phonics sequence
         // (Letters & Sounds Phase 2 letter order). Every word is a fully
         // decodable CVC/VC word using ONLY single-letter graphemes and short
-        // vowels introduced up to that set — no digraphs (sh, th, ee), blends,
-        // double letters, or irregular words. This keeps the letter-by-letter
-        // "Sound it out" blend accurate. Group order = teaching order.
-        this.defaultWords = [
-            // Set 1: s a t p
-            "at", "sat", "pat", "tap", "sap",
-            // Set 2: + i n m d
-            "am", "an", "in", "it", "sit", "pin", "pan", "tin", "tip", "nip",
-            "dip", "nap", "map", "mat", "man", "mad", "dad", "did", "sad",
-            // Set 3: + g o c k
-            "on", "got", "dog", "cat", "can", "cap", "cot", "cod", "cog", "gap",
-            "gas", "nag", "tag", "sag", "dig", "pig", "dot", "top", "pot", "pop",
-            "mop", "not", "nod", "kid", "kit",
-            // Set 4: + e u r
-            "up", "us", "pet", "pen", "ten", "net", "men", "met", "get", "set",
-            "den", "red", "peg", "cup", "cut", "nut", "sun", "gun", "run", "ran",
-            "rat", "rap", "rim", "rip", "rod", "rot", "mud", "mug", "rug",
-            // Set 5: + h b f l
-            "hat", "had", "ham", "hit", "hot", "hut", "hop", "hum", "hug", "him",
-            "hip", "hen", "bad", "bag", "bat", "bed", "big", "bin", "bit", "bun",
-            "bus", "bug", "but", "fan", "fat", "fig", "fin", "fun", "fed", "lap",
-            "lad", "leg", "let", "lid", "lip", "lot", "log", "lit"
+        // vowels introduced up to that level — no digraphs (sh, th, ee),
+        // blends, double letters, or irregular words. This keeps the
+        // letter-by-letter "Sound it out" blend accurate.
+        this.LEVELS = [
+            {
+                id: 'level1', name: 'Level 1', letters: 's a t p',
+                words: ["at", "sat", "pat", "tap", "sap"]
+            },
+            {
+                id: 'level2', name: 'Level 2', letters: 'i n m d',
+                words: ["am", "an", "in", "it", "sit", "pin", "pan", "tin", "tip",
+                    "nip", "dip", "nap", "map", "mat", "man", "mad", "dad", "did", "sad"]
+            },
+            {
+                id: 'level3', name: 'Level 3', letters: 'g o c k',
+                words: ["on", "got", "dog", "cat", "can", "cap", "cot", "cod", "cog",
+                    "gap", "gas", "nag", "tag", "sag", "dig", "pig", "dot", "top", "pot",
+                    "pop", "mop", "not", "nod", "kid", "kit"]
+            },
+            {
+                id: 'level4', name: 'Level 4', letters: 'e u r',
+                words: ["up", "us", "pet", "pen", "ten", "net", "men", "met", "get",
+                    "set", "den", "red", "peg", "cup", "cut", "nut", "sun", "gun", "run",
+                    "ran", "rat", "rap", "rim", "rip", "rod", "rot", "mud", "mug", "rug"]
+            },
+            {
+                id: 'level5', name: 'Level 5', letters: 'h b f l',
+                words: ["hat", "had", "ham", "hit", "hot", "hut", "hop", "hum", "hug",
+                    "him", "hip", "hen", "bad", "bag", "bat", "bed", "big", "bin", "bit",
+                    "bun", "bus", "bug", "but", "fan", "fat", "fig", "fin", "fun", "fed",
+                    "lap", "lad", "leg", "let", "lid", "lip", "lot", "log", "lit"]
+            }
         ];
-        this.STORAGE_KEY = 'readstar_words';
-        this.init();
+
+        this.CUSTOM_ID = 'custom';
+        this.STORAGE_KEY = 'readstar_words';   // editable "Custom" word list
+        this.LEVEL_KEY = 'readstar_level';     // currently selected level id
+
+        // Custom list defaults to every built-in word (so an edited list keeps
+        // working exactly as before levels existed).
+        this.customWords = Storage.get(this.STORAGE_KEY, this.allLevelWords());
+
+        // Selected level defaults to the first level.
+        this.activeLevel = Storage.get(this.LEVEL_KEY, this.LEVELS[0].id);
+
+        this.applyActiveLevel();
     }
 
-    init() {
-        const storedWords = Storage.get(this.STORAGE_KEY, this.defaultWords);
-        this.setWords(storedWords);
+    allLevelWords() {
+        return this.LEVELS.flatMap(level => level.words);
     }
 
-    setWords(wordList) {
-        this.words = new Set(wordList.map(w => w.toLowerCase().trim()).filter(w => w.length > 0));
+    getLevels() {
+        return this.LEVELS;
+    }
+
+    getActiveLevel() {
+        return this.activeLevel;
+    }
+
+    setActiveLevel(id) {
+        this.activeLevel = id;
+        Storage.set(this.LEVEL_KEY, id);
+        this.applyActiveLevel();
+    }
+
+    // Rebuild the active word set + prefix map from whichever level is selected.
+    applyActiveLevel() {
+        let words;
+        if (this.activeLevel === this.CUSTOM_ID) {
+            words = this.customWords;
+        } else {
+            const level = this.LEVELS.find(l => l.id === this.activeLevel);
+            words = level ? level.words : this.customWords;
+        }
+        this.words = new Set(words.map(w => w.toLowerCase().trim()).filter(w => w.length > 0));
         this.buildPrefixMap();
-        Storage.set(this.STORAGE_KEY, Array.from(this.words));
+    }
+
+    getCustomWords() {
+        return [...this.customWords];
+    }
+
+    setCustomWords(wordList) {
+        this.customWords = wordList.map(w => w.toLowerCase().trim()).filter(w => w.length > 0);
+        Storage.set(this.STORAGE_KEY, this.customWords);
+        if (this.activeLevel === this.CUSTOM_ID) {
+            this.applyActiveLevel();
+        }
     }
 
     getWords() {
@@ -64,9 +118,6 @@ export class WordManager {
                 this.prefixMap.get(prefix).add(char);
                 prefix += char;
             }
-            // Mark end of word? 
-            // The spec implies we just need to know valid *next* letters.
-            // We can check if a prefix is a complete word separately.
         }
     }
 
@@ -81,20 +132,5 @@ export class WordManager {
 
     isCompleteWord(text) {
         return this.words.has(text);
-    }
-
-    addWord(word) {
-        const cleanWord = word.toLowerCase().trim();
-        if (cleanWord && !this.words.has(cleanWord)) {
-            this.words.add(cleanWord);
-            this.buildPrefixMap();
-            Storage.set(this.STORAGE_KEY, Array.from(this.words));
-            return true;
-        }
-        return false;
-    }
-
-    resetToDefaults() {
-        this.setWords(this.defaultWords);
     }
 }
