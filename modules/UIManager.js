@@ -3,9 +3,15 @@ export class UIManager {
         this.introScreen = document.getElementById('intro-screen');
         this.introTitle = document.getElementById('intro-title');
         this.btnOpenReadstar = document.getElementById('btn-open-readstar');
+        this.btnOpenBuild = document.getElementById('btn-open-build');
         this.btnOpenLetterCrunch = document.getElementById('btn-open-letter-crunch');
         this.mainApp = document.getElementById('main-app');
         this.letterCrunchApp = document.getElementById('letter-crunch-app');
+        this.levelSelect = document.getElementById('level-select');
+        this.levelGrid = document.getElementById('level-grid');
+        this.levelBanner = document.getElementById('level-banner');
+        this.wordPicture = document.getElementById('word-picture');
+        this.btnLevelHome = document.getElementById('btn-level-home');
         this.grid = document.getElementById('letter-grid');
         this.prefixDisplay = document.getElementById('prefix-display');
         this.btnBack = document.getElementById('btn-back');
@@ -14,7 +20,14 @@ export class UIManager {
         this.btnCloseSettings = document.getElementById('btn-close-settings');
         this.settingsModal = document.getElementById('settings-modal');
         this.btnRead = document.getElementById('btn-read');
+        this.btnSoundOut = document.getElementById('btn-sound-out');
+        this.btnComplete = document.getElementById('btn-complete');
+        this.btnCheck = document.getElementById('btn-check');
+        this.buildPrompt = document.getElementById('build-prompt');
+        this.btnHearWord = document.getElementById('btn-hear-word');
         this.actionArea = document.getElementById('action-area');
+        // Whether the microphone "Read this word" button should be offered.
+        this.speechAvailable = true;
         this.btnLetterCrunchHome = document.getElementById('btn-letter-crunch-home');
         this.btnLetterCrunchReset = document.getElementById('btn-letter-crunch-reset');
         this.player1Score = document.getElementById('player1-score');
@@ -33,6 +46,8 @@ export class UIManager {
         this.btnClearLog = document.getElementById('btn-clear-log');
         this.toggleSounds = document.getElementById('toggle-sounds');
         this.toggleSpeechPrompts = document.getElementById('toggle-speech-prompts');
+        this.toggleSpeechRecognition = document.getElementById('toggle-speech-recognition');
+        this.toggleLetterFilter = document.getElementById('toggle-letter-filter');
 
         this.callbacks = {};
         this.alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -42,11 +57,16 @@ export class UIManager {
 
     bindInternalEvents() {
         this.btnOpenReadstar.addEventListener('click', () => this.emit('openReadstar'));
+        this.btnOpenBuild.addEventListener('click', () => this.emit('openBuild'));
         this.btnOpenLetterCrunch.addEventListener('click', () => this.emit('openLetterCrunch'));
 
         this.btnBack.addEventListener('click', () => this.emit('back'));
         this.btnClear.addEventListener('click', () => this.emit('clear'));
         this.btnRead.addEventListener('click', () => this.emit('read'));
+        this.btnSoundOut.addEventListener('click', () => this.emit('soundOut'));
+        this.btnComplete.addEventListener('click', () => this.emit('complete'));
+        this.btnCheck.addEventListener('click', () => this.emit('check'));
+        this.btnHearWord.addEventListener('click', () => this.emit('hearWord'));
 
         this.btnSettings.addEventListener('click', () => this.toggleSettings(true));
         this.btnCloseSettings.addEventListener('click', () => this.toggleSettings(false));
@@ -60,6 +80,10 @@ export class UIManager {
 
         this.toggleSounds.addEventListener('change', (e) => this.emit('toggleSounds', e.target.checked));
         this.toggleSpeechPrompts.addEventListener('change', (e) => this.emit('toggleSpeechPrompts', e.target.checked));
+        this.toggleSpeechRecognition.addEventListener('change', (e) => this.emit('toggleSpeechRecognition', e.target.checked));
+        this.toggleLetterFilter.addEventListener('change', (e) => this.emit('toggleLetterFilter', e.target.checked));
+
+        this.btnLevelHome.addEventListener('click', () => this.emit('showHome'));
 
         this.btnLetterCrunchHome.addEventListener('click', () => this.emit('showHome'));
         this.btnLetterCrunchReset.addEventListener('click', () => this.emit('resetLetterCrunch'));
@@ -88,15 +112,18 @@ export class UIManager {
         }
     }
 
-    renderGrid(validLetters) {
+    renderGrid(inventory, validGraphemes, filterEnabled = true) {
         this.grid.innerHTML = '';
-        this.alphabet.forEach(letter => {
+        inventory.forEach(grapheme => {
             const btn = document.createElement('button');
             btn.className = 'letter-btn';
-            btn.textContent = letter;
+            if (grapheme.length > 1) btn.classList.add('digraph');
+            btn.textContent = grapheme;
 
-            if (validLetters.has(letter)) {
-                btn.onclick = () => this.emit('letterClick', letter);
+            // When the guide filter is off, every tile is selectable so the
+            // child chooses by sound instead of following the only lit tile.
+            if (!filterEnabled || validGraphemes.has(grapheme)) {
+                btn.onclick = () => this.emit('graphemeClick', grapheme);
             } else {
                 btn.classList.add('disabled');
                 btn.disabled = true;
@@ -106,15 +133,77 @@ export class UIManager {
         });
     }
 
-    updatePrefix(prefix, isComplete) {
-        this.prefixDisplay.textContent = prefix;
-        this.prefixDisplay.className = prefix ? '' : 'empty';
-        if (isComplete) {
-            this.prefixDisplay.classList.add('complete');
-            this.btnRead.classList.remove('hidden');
-        } else {
-            this.btnRead.classList.add('hidden');
+    updatePrefix(graphemes, showComplete) {
+        // Render each grapheme as its own span so the blending ("sound it out")
+        // sequence can highlight one sound at a time (digraphs stay together).
+        this.prefixDisplay.innerHTML = '';
+        for (const g of graphemes) {
+            const span = document.createElement('span');
+            span.className = 'prefix-letter';
+            if (g.length > 1) span.classList.add('digraph');
+            span.textContent = g;
+            this.prefixDisplay.appendChild(span);
         }
+        this.prefixDisplay.className = graphemes.length > 0 ? '' : 'empty';
+        // Only the read activity reveals correctness with the green styling;
+        // Build mode must not give away whether the attempt is right.
+        if (showComplete) this.prefixDisplay.classList.add('complete');
+    }
+
+    // Show the right action buttons for the current activity.
+    //   read  mode: Sound it out + (mic) + "I read it", once a word is formed.
+    //   build mode: Sound it out + Check, once any tiles are placed.
+    updateActions({ mode, isComplete, hasContent }) {
+        const buildMode = mode === 'build';
+        this.buildPrompt.classList.toggle('hidden', !buildMode);
+
+        const showRead = !buildMode && isComplete && this.speechAvailable;
+        const showComplete = !buildMode && isComplete;
+        const showCheck = buildMode && hasContent;
+        const showSoundOut = buildMode ? hasContent : isComplete;
+
+        this.btnRead.classList.toggle('hidden', !showRead);
+        this.btnComplete.classList.toggle('hidden', !showComplete);
+        this.btnCheck.classList.toggle('hidden', !showCheck);
+        this.btnSoundOut.classList.toggle('hidden', !showSoundOut);
+    }
+
+    setSpeechAvailable(available) {
+        this.speechAvailable = available;
+    }
+
+    // Show an emoji picture for the word (or hide it when there's none).
+    setPicture(emoji) {
+        if (emoji) {
+            this.wordPicture.textContent = emoji;
+            this.wordPicture.classList.remove('hidden');
+        } else {
+            this.wordPicture.textContent = '';
+            this.wordPicture.classList.add('hidden');
+        }
+    }
+
+    highlightLetter(index) {
+        const letters = this.prefixDisplay.querySelectorAll('.prefix-letter');
+        letters.forEach((el, i) => el.classList.toggle('blending', i === index));
+    }
+
+    highlightWholeWord() {
+        this.prefixDisplay.querySelectorAll('.prefix-letter')
+            .forEach(el => el.classList.add('blending'));
+    }
+
+    clearBlendHighlight() {
+        this.prefixDisplay.querySelectorAll('.prefix-letter')
+            .forEach(el => el.classList.remove('blending'));
+    }
+
+    setBlending(active) {
+        this.btnSoundOut.classList.toggle('blending', active);
+        this.btnSoundOut.disabled = active;
+        this.btnRead.disabled = active;
+        this.btnComplete.disabled = active;
+        this.btnCheck.disabled = active;
     }
 
     toggleSettings(show) {
@@ -135,24 +224,77 @@ export class UIManager {
 
         this.toggleSounds.checked = settings.soundsEnabled;
         this.toggleSpeechPrompts.checked = settings.speechPromptsEnabled;
+        this.toggleSpeechRecognition.checked = settings.speechRecognitionEnabled;
+        this.toggleLetterFilter.checked = settings.filterEnabled;
+    }
+
+    hideAllScreens() {
+        this.introScreen.classList.add('hidden');
+        this.levelSelect.classList.add('hidden');
+        this.mainApp.classList.add('hidden');
+        this.letterCrunchApp.classList.add('hidden');
     }
 
     showMainApp() {
-        this.introScreen.classList.add('hidden');
-        this.letterCrunchApp.classList.add('hidden');
+        this.hideAllScreens();
         this.mainApp.classList.remove('hidden');
     }
 
     showLetterCrunchApp() {
-        this.introScreen.classList.add('hidden');
-        this.mainApp.classList.add('hidden');
+        this.hideAllScreens();
         this.letterCrunchApp.classList.remove('hidden');
     }
 
     showHome() {
+        this.hideAllScreens();
         this.introScreen.classList.remove('hidden');
-        this.mainApp.classList.add('hidden');
-        this.letterCrunchApp.classList.add('hidden');
+    }
+
+    showLevelSelect() {
+        this.hideAllScreens();
+        this.levelSelect.classList.remove('hidden');
+    }
+
+    setLevelBanner(text) {
+        this.levelBanner.textContent = text;
+    }
+
+    // Render the level cards from view-models:
+    // { id, name, letters, got, total, mastered, locked, isCustom }
+    renderLevelSelect(levels) {
+        this.levelGrid.innerHTML = '';
+        levels.forEach(level => {
+            const card = document.createElement('button');
+            card.className = 'level-card';
+            if (level.locked) card.classList.add('locked');
+            if (level.mastered) card.classList.add('mastered');
+            if (level.isCustom) card.classList.add('custom');
+
+            let progressText;
+            if (level.locked) {
+                progressText = '🔒 Locked';
+            } else if (level.isCustom) {
+                progressText = `${level.total} words`;
+            } else {
+                progressText = level.mastered
+                    ? `★ ${level.got}/${level.total}`
+                    : `${level.got}/${level.total}`;
+            }
+
+            card.innerHTML = `
+                <span class="level-name">${level.name}</span>
+                <span class="level-letters">${level.letters}</span>
+                <span class="level-progress">${progressText}</span>
+            `;
+
+            if (level.locked) {
+                card.disabled = true;
+            } else {
+                card.addEventListener('click', () => this.emit('selectLevel', level.id));
+            }
+
+            this.levelGrid.appendChild(card);
+        });
     }
 
     updateLetterCrunch(state) {

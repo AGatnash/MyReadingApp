@@ -4,6 +4,7 @@ import { Storage } from './modules/Storage.js';
 import { AudioManager } from './modules/AudioManager.js';
 import { SpeechRecognizer } from './modules/SpeechRecognizer.js';
 import { Confetti } from './modules/Confetti.js';
+import { getPicture } from './modules/pictures.js';
 
 const PHONETIC_MAP = {
     a: ['a', 'ay', 'eh', 'hey', 'aye'],
@@ -34,6 +35,12 @@ const PHONETIC_MAP = {
     z: ['z', 'zee', 'zed', 'ze', 'said']
 };
 
+// Fraction of a level's words a child must read to "master" it and unlock the
+// next level. Below 100% on purpose: with a flaky mic (or a couple of stubborn
+// words) requiring every single word could stall a learner. They can still go
+// back and finish the rest.
+const MASTERY_RATIO = 0.8;
+
 function levenshteinDistance(a, b) {
     const m = a.length, n = b.length;
     const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
@@ -58,9 +65,14 @@ class App {
         this.confetti = new Confetti();
 
         this.state = {
-            prefix: '',
+            graphemes: [],
+            mode: 'read',      // 'read' (ReadStar) or 'build' (Movable Alphabet)
+            target: null,      // target spelling to build, in build mode
+            isBlending: false,
             soundsEnabled: Storage.get('readstar_sounds', true),
             speechPromptsEnabled: Storage.get('readstar_speech', true),
+            speechRecognitionEnabled: Storage.get('readstar_speech_check', true),
+            filterEnabled: Storage.get('readstar_filter', true),
             completedWords: Storage.get('readstar_completed', []),
             letterCrunch: {
                 scores: { 1: 0, 2: 0 },
@@ -80,36 +92,60 @@ class App {
 
     init() {
         this.bindEvents();
+        this.syncSpeechAvailability();
         this.ui.showHome();
         this.render();
     }
 
+    // The microphone check is offered only when the browser supports it AND
+    // the parent hasn't switched it off.
+    syncSpeechAvailability() {
+        this.ui.setSpeechAvailable(this.speech.isSupported && this.state.speechRecognitionEnabled);
+    }
+
     bindEvents() {
-        this.ui.on('openReadstar', () => this.ui.showMainApp());
+        this.ui.on('openReadstar', () => {
+            this.state.mode = 'read';
+            this.showLevelSelectScreen();
+        });
+        this.ui.on('openBuild', () => {
+            this.state.mode = 'build';
+            this.showLevelSelectScreen();
+        });
+        this.ui.on('selectLevel', (id) => this.handleSelectLevel(id));
         this.ui.on('openLetterCrunch', () => {
             this.ui.showLetterCrunchApp();
             this.renderLetterCrunch();
         });
         this.ui.on('showHome', () => this.ui.showHome());
-        this.ui.on('letterClick', (letter) => this.handleLetterClick(letter));
+        this.ui.on('graphemeClick', (grapheme) => this.handleGraphemeClick(grapheme));
         this.ui.on('back', () => this.handleBack());
         this.ui.on('clear', () => this.handleClear());
         this.ui.on('read', () => this.handleRead());
+        this.ui.on('soundOut', () => this.handleSoundOut());
+        this.ui.on('complete', () => this.handleManualComplete());
+        this.ui.on('check', () => this.handleCheck());
+        this.ui.on('hearWord', () => this.handleHearWord());
 
         this.ui.on('openSettings', () => {
             this.ui.populateSettings(
-                this.wordManager.getWords(),
+                this.wordManager.getCustomWords(),
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
-                    speechPromptsEnabled: this.state.speechPromptsEnabled
+                    speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    speechRecognitionEnabled: this.state.speechRecognitionEnabled,
+                    filterEnabled: this.state.filterEnabled
                 }
             );
         });
 
         this.ui.on('saveWords', (text) => {
             const words = text.split('\n');
-            this.wordManager.setWords(words);
+            this.wordManager.setCustomWords(words);
+            // Editing the word list switches play to the Custom level.
+            this.wordManager.setActiveLevel('custom');
+            this.updateLevelBanner();
             this.handleClear(); // Reset state on word list change
         });
 
@@ -117,11 +153,13 @@ class App {
             this.state.completedWords = [];
             Storage.set('readstar_completed', []);
             this.ui.populateSettings(
-                this.wordManager.getWords(),
+                this.wordManager.getCustomWords(),
                 this.state.completedWords,
                 {
                     soundsEnabled: this.state.soundsEnabled,
-                    speechPromptsEnabled: this.state.speechPromptsEnabled
+                    speechPromptsEnabled: this.state.speechPromptsEnabled,
+                    speechRecognitionEnabled: this.state.speechRecognitionEnabled,
+                    filterEnabled: this.state.filterEnabled
                 }
             );
         });
@@ -138,73 +176,265 @@ class App {
             this.audio.setSpeechPromptsEnabled(enabled);
         });
 
+        this.ui.on('toggleSpeechRecognition', (enabled) => {
+            this.state.speechRecognitionEnabled = enabled;
+            Storage.set('readstar_speech_check', enabled);
+            this.syncSpeechAvailability();
+            this.render();
+        });
+
+        this.ui.on('toggleLetterFilter', (enabled) => {
+            this.state.filterEnabled = enabled;
+            Storage.set('readstar_filter', enabled);
+            this.render();
+        });
+
         this.ui.on('letterCrunchHoldStart', (player) => this.handleLetterCrunchHoldStart(player));
         this.ui.on('letterCrunchHoldEnd', (player) => this.handleLetterCrunchHoldEnd(player));
         this.ui.on('resetLetterCrunch', () => this.resetLetterCrunch());
     }
 
-    handleLetterClick(letter) {
-        const newPrefix = this.state.prefix + letter;
-        if (this.wordManager.isValidNextLetter(this.state.prefix, letter)) {
-            this.state.prefix = newPrefix;
-            this.render();
-            this.audio.playLetterSound(letter);
+    currentWord() {
+        return this.state.graphemes.join('');
+    }
+
+    handleGraphemeClick(grapheme) {
+        if (this.state.isBlending) return;
+        // In read mode with the guide filter on, only graphemes that continue a
+        // real word are accepted. With the filter off — and always in build
+        // mode (Movable Alphabet) — any tile is accepted so the child chooses by
+        // sound and can make (and hear) their own mistakes.
+        if (this.state.mode === 'read' && this.state.filterEnabled &&
+            !this.wordManager.isValidNextGrapheme(this.currentWord(), grapheme)) {
+            return;
         }
+        this.state.graphemes.push(grapheme);
+        this.render();
+        this.audio.playGraphemeSound(grapheme);
     }
 
     handleBack() {
-        if (this.state.prefix.length > 0) {
-            this.state.prefix = this.state.prefix.slice(0, -1);
+        if (this.state.isBlending) return;
+        if (this.state.graphemes.length > 0) {
+            this.state.graphemes.pop();
             this.render();
         } else {
-            this.ui.showHome();
+            // Backing out of an empty word returns to the level picker.
+            this.showLevelSelectScreen();
         }
+    }
+
+    showLevelSelectScreen() {
+        this.ui.renderLevelSelect(this.buildLevelViewModels());
+        this.ui.showLevelSelect();
+    }
+
+    // A level is mastered when every one of its words has been completed.
+    // Each level unlocks only once the previous one is mastered; "Custom"
+    // (the editable list) is always available.
+    buildLevelViewModels() {
+        const completed = new Set(this.state.completedWords);
+        const vms = [];
+        let prevMastered = true; // Level 1 is always unlocked.
+
+        for (const level of this.wordManager.getLevels()) {
+            // level.words may carry grapheme separators (e.g. "sh.i.p");
+            // compare against plain spellings, which is what gets logged.
+            const spellings = this.wordManager.spellingsOf(level.words);
+            const got = spellings.filter(w => completed.has(w)).length;
+            const total = spellings.length;
+            const mastered = total > 0 && got >= Math.ceil(total * MASTERY_RATIO);
+            vms.push({
+                id: level.id,
+                name: level.name,
+                letters: level.letters,
+                got,
+                total,
+                mastered,
+                locked: !prevMastered,
+                isCustom: false
+            });
+            prevMastered = mastered;
+        }
+
+        const custom = this.wordManager.getCustomWords();
+        vms.push({
+            id: 'custom',
+            name: 'Custom',
+            letters: '✎',
+            got: 0,
+            total: custom.length,
+            mastered: false,
+            locked: false,
+            isCustom: true
+        });
+
+        return vms;
+    }
+
+    handleSelectLevel(id) {
+        this.wordManager.setActiveLevel(id);
+        this.state.graphemes = [];
+        this.updateLevelBanner();
+        this.ui.showMainApp();
+        if (this.state.mode === 'build') {
+            this.startBuildRound();
+        } else {
+            this.render();
+        }
+    }
+
+    // Movable Alphabet: pick a target word, clear the board, say it aloud.
+    startBuildRound() {
+        const words = this.wordManager.getWords();
+        if (words.length === 0) return;
+        let next = words[Math.floor(Math.random() * words.length)];
+        if (words.length > 1) {
+            while (next === this.state.target) {
+                next = words[Math.floor(Math.random() * words.length)];
+            }
+        }
+        this.state.target = next;
+        this.state.graphemes = [];
+        this.render();
+        this.audio.speakWord(next);
+    }
+
+    handleHearWord() {
+        if (this.state.target) this.audio.speakWord(this.state.target);
+    }
+
+    handleCheck() {
+        if (this.state.isBlending) return;
+        const built = this.currentWord();
+        if (!built) return;
+
+        if (built === this.state.target) {
+            this.audio.playSuccess();
+            this.recordCompletion(built);
+            setTimeout(() => this.startBuildRound(), 1500);
+        } else {
+            // Gentle: don't reveal the answer or wipe the board — let the child
+            // self-correct with Back/Clear, and offer the word again.
+            this.audio.playFailure();
+        }
+    }
+
+    updateLevelBanner() {
+        const id = this.wordManager.getActiveLevel();
+        if (id === 'custom') {
+            this.ui.setLevelBanner('Custom Words');
+            return;
+        }
+        const level = this.wordManager.getLevels().find(l => l.id === id);
+        this.ui.setLevelBanner(level ? `${level.name} · ${level.letters.toUpperCase()}` : '');
     }
 
     handleClear() {
-        this.state.prefix = '';
+        if (this.state.isBlending) return;
+        this.state.graphemes = [];
         this.render();
     }
 
-    handleRead() {
-        if (!this.speech.isSupported) {
-            alert("Speech recognition is not supported in this browser.");
-            return;
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async handleSoundOut() {
+        const graphemes = this.state.graphemes;
+        const word = this.currentWord();
+        if (this.state.isBlending || !word) return;
+
+        this.state.isBlending = true;
+        this.ui.setBlending(true);
+
+        // Step 1: highlight and sound each grapheme in turn (sh ... i ... p).
+        for (let i = 0; i < graphemes.length; i++) {
+            this.ui.highlightLetter(i);
+            this.audio.playGraphemeSound(graphemes[i]);
+            await this.delay(850);
         }
+
+        // Step 2: blend — light up the whole word and say it as one.
+        this.ui.highlightWholeWord();
+        this.audio.speakWord(word);
+        await this.delay(1200);
+
+        this.ui.clearBlendHighlight();
+        this.ui.setBlending(false);
+        this.state.isBlending = false;
+    }
+
+    handleRead() {
+        if (this.state.isBlending) return;
+        // The mic button is only shown when speech is available, but guard
+        // anyway and fail silently (the manual "I read it" button still works).
+        if (!this.speech.isSupported || !this.state.speechRecognitionEnabled) return;
 
         this.ui.btnRead.classList.add('listening');
 
         this.speech.start(
-            (transcript) => {
+            (transcripts) => {
                 this.ui.btnRead.classList.remove('listening');
-                this.verifySpokenWord(transcript);
+                this.verifySpokenWord(transcripts);
             },
             (error) => {
                 this.ui.btnRead.classList.remove('listening');
                 console.error("Speech error:", error);
+                this.audio.playFailure();
             }
         );
     }
 
-    verifySpokenWord(transcript) {
-        const target = this.state.prefix.toLowerCase();
-        const spoken = transcript.toLowerCase().trim();
+    // Forgiving match: accept the word if ANY recognizer alternative contains a
+    // token that equals the target or is within a small edit distance of it.
+    // Uses whole-word tokens (not substrings) so short targets like "at" are no
+    // longer falsely matched by "cat", while still tolerating children's
+    // mispronunciations and the recognizer mishearing them.
+    verifySpokenWord(transcripts) {
+        const target = this.currentWord().toLowerCase();
+        // Edit-distance tolerance scaled to word length. Short CVC words use 0
+        // (so "at" is never matched by "cat"); longer words tolerate a slip or
+        // two. Forgiveness comes mainly from checking all recognizer
+        // alternatives and the always-available manual "I read it" button.
+        const tolerance = target.length <= 3 ? 0 : (target.length <= 6 ? 1 : 2);
 
-        console.log(`Target: ${target}, Spoken: ${spoken}`);
+        const matched = transcripts.some(transcript => {
+            const tokens = transcript.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/);
+            return tokens.some(token =>
+                token.length > 0 && levenshteinDistance(token, target) <= tolerance);
+        });
 
-        if (spoken.includes(target) || target.includes(spoken)) {
-            this.handleWordComplete(this.state.prefix);
+        console.log(`Target: ${target}, Heard: [${transcripts.join(' | ')}], Match: ${matched}`);
+
+        if (matched) {
+            this.handleWordComplete(target);
         } else {
             this.audio.playFailure();
         }
     }
 
-    handleWordComplete(word) {
-        this.audio.playSuccess();
-        this.confetti.start();
+    // Adult "they read it" tap — completes the word without the mic. Always
+    // available, and the only completion path when speech is off/unsupported.
+    handleManualComplete() {
+        if (this.state.isBlending) return;
+        const word = this.currentWord();
+        if (this.wordManager.isCompleteWord(word)) {
+            this.handleWordComplete(word);
+        }
+    }
 
+    // Celebrate and log a word read/built (drives the completed-words log and
+    // level mastery, regardless of which activity or completion path produced it).
+    recordCompletion(word) {
+        this.confetti.start();
         this.state.completedWords.unshift(word);
         Storage.set('readstar_completed', this.state.completedWords);
+    }
+
+    handleWordComplete(word) {
+        this.audio.playSuccess();
+        this.recordCompletion(word);
 
         setTimeout(() => {
             if (confirm(`Great job! You read "${word}". Start a new word?`)) {
@@ -228,9 +458,9 @@ class App {
         this.renderLetterCrunch();
 
         this.speech.start(
-            (transcript) => {
+            (transcripts) => {
                 game.isListening = false;
-                this.handleLetterCrunchGuess(transcript, player);
+                this.handleLetterCrunchGuess(transcripts, player);
             },
             (error) => {
                 game.isListening = false;
@@ -246,19 +476,20 @@ class App {
         this.speech.stop();
     }
 
-    handleLetterCrunchGuess(transcript, player) {
+    handleLetterCrunchGuess(transcripts, player) {
         const game = this.state.letterCrunch;
         const target = game.currentLetter;
-        const spoken = this.normalizeLetterGuess(transcript, target);
+        // Accept if any recognizer alternative normalizes to the target letter.
+        const correct = transcripts.some(t => this.normalizeLetterGuess(t, target) === target);
 
-        if (spoken === target) {
+        if (correct) {
             game.scores[player] += 1;
             game.status = `Nice! Player ${player} got ${target.toUpperCase()} correct.`;
             this.ui.animateCrunch(player);
             this.audio.playSuccess();
             game.currentLetter = this.getRandomLetter();
         } else {
-            game.status = `Heard "${transcript}". Needed "${target.toUpperCase()}".`;
+            game.status = `Heard "${transcripts[0] || ''}". Needed "${target.toUpperCase()}".`;
             this.audio.playFailure();
         }
 
@@ -330,11 +561,28 @@ class App {
     }
 
     render() {
-        const validNext = this.wordManager.getValidNextLetters(this.state.prefix);
-        const isComplete = this.wordManager.isCompleteWord(this.state.prefix);
+        const inventory = this.wordManager.getGraphemeInventory();
+        const hasContent = this.state.graphemes.length > 0;
 
-        this.ui.updatePrefix(this.state.prefix, isComplete);
-        this.ui.renderGrid(validNext);
+        if (this.state.mode === 'build') {
+            // Full board, no filtering or correctness reveal — the child must
+            // choose each grapheme from the sounds they hear. The target's
+            // picture is the meaning cue ("build the name of this thing").
+            this.ui.updatePrefix(this.state.graphemes, false);
+            this.ui.renderGrid(inventory, new Set(), false);
+            this.ui.updateActions({ mode: 'build', isComplete: false, hasContent });
+            this.ui.setPicture(getPicture(this.state.target));
+        } else {
+            const prefix = this.currentWord();
+            const validNext = this.wordManager.getValidNextGraphemes(prefix);
+            const isComplete = this.wordManager.isCompleteWord(prefix);
+            this.ui.updatePrefix(this.state.graphemes, isComplete);
+            this.ui.renderGrid(inventory, validNext, this.state.filterEnabled);
+            this.ui.updateActions({ mode: 'read', isComplete, hasContent });
+            // Reveal the picture only once the word is fully decoded.
+            this.ui.setPicture(isComplete ? getPicture(prefix) : null);
+        }
+
         this.renderLetterCrunch();
     }
 }

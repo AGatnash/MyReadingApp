@@ -9,6 +9,9 @@ export class SpeechRecognizer {
             this.recognition.continuous = false;
             this.recognition.interimResults = false;
             this.recognition.lang = 'en-US'; // Could be configurable
+            // Ask for several guesses; children's speech is often misheard, so
+            // matching against all alternatives makes the check more forgiving.
+            this.recognition.maxAlternatives = 5;
             this.isSupported = true;
         }
     }
@@ -20,8 +23,9 @@ export class SpeechRecognizer {
         }
 
         this.recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            onResult(transcript);
+            // Pass back every alternative the recognizer offers.
+            const transcripts = Array.from(event.results[0], alt => alt.transcript);
+            onResult(transcripts);
         };
 
         this.recognition.onerror = (event) => {

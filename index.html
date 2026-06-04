@@ -18,11 +18,41 @@
             <p>Choose a game</p>
             <div id="game-menu">
                 <button id="btn-open-readstar" class="menu-btn">ReadStar</button>
+                <button id="btn-open-build" class="menu-btn">Build a Word</button>
                 <button id="btn-open-letter-crunch" class="menu-btn">Letter Crunch</button>
             </div>
         </section>
 
+        <section id="level-select" class="hidden" aria-label="Choose a level">
+            <div class="level-select-header">
+                <button id="btn-level-home" class="control-btn" aria-label="Back to Home">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <h2>Choose a Level</h2>
+                <span class="control-spacer" aria-hidden="true"></span>
+            </div>
+            <div id="level-grid">
+                <!-- Level cards injected here -->
+            </div>
+        </section>
+
         <div id="main-app" class="hidden">
+            <div id="level-banner"></div>
+            <div id="word-picture" class="hidden" aria-hidden="true"></div>
+            <div id="build-prompt" class="hidden">
+                <span class="build-prompt-text">Build the word you hear</span>
+                <button id="btn-hear-word" class="control-btn" aria-label="Hear the word again">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                    </svg>
+                </button>
+            </div>
             <header>
                 <div id="prefix-display" class="empty"></div>
             </header>
@@ -52,13 +82,33 @@
             </div>
 
             <div id="action-area">
-                <button id="btn-read" class="action-btn hidden" aria-label="Read this word">
+                <button id="btn-sound-out" class="action-btn sound-btn hidden" aria-label="Sound it out">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                        <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                    </svg>
+                </button>
+                <button id="btn-read" class="action-btn listen-btn hidden" aria-label="Read this word">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                         <line x1="12" y1="19" x2="12" y2="23" />
                         <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                </button>
+                <button id="btn-complete" class="action-btn hidden" aria-label="I read it">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                </button>
+                <button id="btn-check" class="action-btn hidden" aria-label="Check my word">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </button>
             </div>
@@ -127,6 +177,14 @@
                     <label class="toggle">
                         <input type="checkbox" id="toggle-speech-prompts" checked>
                         <span>Speech Prompts</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggle-speech-recognition" checked>
+                        <span>Listen for Reading (microphone check)</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="toggle-letter-filter" checked>
+                        <span>Guide Letters (only show valid next letters)</span>
                     </label>
                 </div>
 
