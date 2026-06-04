@@ -4,6 +4,7 @@ import { Storage } from './modules/Storage.js';
 import { AudioManager } from './modules/AudioManager.js';
 import { SpeechRecognizer } from './modules/SpeechRecognizer.js';
 import { Confetti } from './modules/Confetti.js';
+import { getPicture } from './modules/pictures.js';
 
 const PHONETIC_MAP = {
     a: ['a', 'ay', 'eh', 'hey', 'aye'],
@@ -565,10 +566,12 @@ class App {
 
         if (this.state.mode === 'build') {
             // Full board, no filtering or correctness reveal — the child must
-            // choose each grapheme from the sounds they hear.
+            // choose each grapheme from the sounds they hear. The target's
+            // picture is the meaning cue ("build the name of this thing").
             this.ui.updatePrefix(this.state.graphemes, false);
             this.ui.renderGrid(inventory, new Set(), false);
             this.ui.updateActions({ mode: 'build', isComplete: false, hasContent });
+            this.ui.setPicture(getPicture(this.state.target));
         } else {
             const prefix = this.currentWord();
             const validNext = this.wordManager.getValidNextGraphemes(prefix);
@@ -576,6 +579,8 @@ class App {
             this.ui.updatePrefix(this.state.graphemes, isComplete);
             this.ui.renderGrid(inventory, validNext, this.state.filterEnabled);
             this.ui.updateActions({ mode: 'read', isComplete, hasContent });
+            // Reveal the picture only once the word is fully decoded.
+            this.ui.setPicture(isComplete ? getPicture(prefix) : null);
         }
 
         this.renderLetterCrunch();

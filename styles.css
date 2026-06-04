@@ -237,6 +237,16 @@ body {
     color: var(--accent-color);
 }
 
+/* Word picture (emoji) — meaning cue for read/build modes */
+#word-picture {
+    flex: 0 0 auto;
+    text-align: center;
+    line-height: 1;
+    font-size: clamp(3rem, 12vmin, 6rem);
+    margin-bottom: 0.5vh;
+    user-select: none;
+}
+
 /* Build (Movable Alphabet) prompt */
 #build-prompt {
     flex: 0 0 auto;

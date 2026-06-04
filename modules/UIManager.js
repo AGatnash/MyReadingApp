@@ -10,6 +10,7 @@ export class UIManager {
         this.levelSelect = document.getElementById('level-select');
         this.levelGrid = document.getElementById('level-grid');
         this.levelBanner = document.getElementById('level-banner');
+        this.wordPicture = document.getElementById('word-picture');
         this.btnLevelHome = document.getElementById('btn-level-home');
         this.grid = document.getElementById('letter-grid');
         this.prefixDisplay = document.getElementById('prefix-display');
@@ -169,6 +170,17 @@ export class UIManager {
 
     setSpeechAvailable(available) {
         this.speechAvailable = available;
+    }
+
+    // Show an emoji picture for the word (or hide it when there's none).
+    setPicture(emoji) {
+        if (emoji) {
+            this.wordPicture.textContent = emoji;
+            this.wordPicture.classList.remove('hidden');
+        } else {
+            this.wordPicture.textContent = '';
+            this.wordPicture.classList.add('hidden');
+        }
     }
 
     highlightLetter(index) {

@@ -42,8 +42,13 @@ phonics) and Montessori reading practice.
       no correctness reveal) and taps Check. Accepts single-letter or digraph
       spellings; successes count toward level mastery. Picture prompts are a
       separate item below.
-- [ ] **Meaning & comprehension** — picture per word, then decodable phrases /
-      sentences, building toward simple decodable mini-books.
+- [x] **Word pictures** — emoji picture per word (`modules/pictures.js`):
+      shown as the Build-mode prompt (build the name of the thing) and revealed
+      in ReadStar once a word is decoded. Covers the concrete nouns in the
+      levels; words with no clear emoji degrade to audio-only.
+- [ ] **Comprehension beyond single words** — decodable phrases / sentences,
+      building toward simple decodable mini-books. (Real illustrations instead
+      of emoji could come here too.)
 - [ ] **Multisensory letter formation** — sandpaper-letter-style finger tracing
       (lowercase, correct stroke order, sound plays as you trace).
 - [ ] **Pure phonemes + clear Sound vs. Name modes** — reconcile ReadStar
